@@ -38,6 +38,15 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:9px;bord
 <section id="actions" class="page"></section>
 <section id="walks" class="page"></section>
 <section id="opportunities" class="page"></section>
+<section id="services" class="page"></section>
+<section id="customers" class="page"></section>
+<section id="quotes" class="page"></section>
+<section id="credit" class="page"></section>
+<section id="goals" class="page"></section>
+<section id="growth" class="page"></section>
+<section id="priorities" class="page"></section>
+<section id="brief" class="page"></section>
+<section id="district" class="page"></section>
 <section id="settings" class="page"></section>
 </main>
 <script>
@@ -45,7 +54,7 @@ const KEY='proCommandCenterV4';
 const TAB=[
  ['dashboard','Dashboard'],['numbers','Numbers'],['specialists','Specialists'],
  ['departments','Departments'],['products','Product Groups'],['associates','Associates'],['actions','Action Plans'],
- ['walks','Daily Walks'],['opportunities','Opportunities'],['settings','Backup']
+ ['walks','Daily Walks'],['opportunities','Opportunities'],['services','Services & Install'],['customers','Customers'],['quotes','Quotes / MVD'],['credit','Credit Growth'],['goals','Goals & KPIs'],['growth','Growth Tracker'],['priorities','Daily Priorities'],['brief','Daily Brief'],['district','District Walk'],['settings','Backup']
 ];
 const starterDepartments=['Pro','Lumber','Building Materials','Millwork','Hardware','Electrical','Plumbing','Flooring','Paint','Garden','Tools','Appliances'];
 let db=load(), current='dashboard', edit={};
@@ -66,9 +75,11 @@ function statusClass(s){return s==='Complete'?'good':s==='Overdue'?'bad':s==='In
 function nav(){document.getElementById('tabs').innerHTML=TAB.map(([id,n])=>`<button class="${current===id?'active':''}" onclick="go('${id}')">${n}</button>`).join('')}
 function go(id){current=id;render()}
 
-function render(){ if(view==='credit'){document.querySelectorAll('.view').forEach(x=>x.style.display='none');document.getElementById('credit').style.display='block';document.getElementById('credit').innerHTML=renderCreditTracker();return;} if(view==='quotes'){document.querySelectorAll('.view').forEach(x=>x.style.display='none');document.getElementById('quotes').style.display='block';document.getElementById('quotes').innerHTML=renderQuoteTracker();return;} if(view==='customers'){document.querySelectorAll('.view').forEach(x=>x.style.display='none');document.getElementById('customers').style.display='block';document.getElementById('customers').innerHTML=renderCustomerTracker();return;} if(view==='goals'){document.querySelectorAll('.view').forEach(x=>x.style.display='none');document.getElementById('goals').style.display='block';document.getElementById('goals').innerHTML=renderGoalCenter();return;} if(view==='brief'){document.querySelectorAll('.view').forEach(x=>x.style.display='none');document.getElementById('brief').style.display='block';document.getElementById('brief').innerHTML=renderDailyBrief();return;} if(view==='priorities'){document.querySelectorAll('.view').forEach(x=>x.style.display='none');document.getElementById('priorities').style.display='block';document.getElementById('priorities').innerHTML=renderSmartPriorities();return;} if(view==='growth'){document.querySelectorAll('.view').forEach(x=>x.style.display='none');document.getElementById('growth').style.display='block';document.getElementById('growth').innerHTML=renderGrowthTracker();return;} if(view==='district'){document.querySelectorAll('.view').forEach(x=>x.style.display='none');document.getElementById('district').style.display='block';document.getElementById('district').innerHTML=renderDistrictWalkReady();return;}
- nav();document.querySelectorAll('.page').forEach(x=>x.classList.toggle('active',x.id===current));
- ({dashboard:renderDashboard,numbers:renderNumbers,specialists:renderSpecialists,departments:renderDepartments,products:renderProducts,associates:renderAssociates,actions:renderActions,walks:renderWalks,opportunities:renderOpportunities,settings:renderSettings}[current])();
+function render(){
+ nav();
+ document.querySelectorAll('.page').forEach(x=>x.classList.toggle('active',x.id===current));
+ const renderers={dashboard:renderDashboard,numbers:renderNumbers,specialists:renderSpecialists,departments:renderDepartments,products:renderProducts,associates:renderAssociates,actions:renderActions,walks:renderWalks,opportunities:renderOpportunities,services:renderServicesInstall,customers:renderCustomerTracker,quotes:renderQuoteTracker,credit:renderCreditTracker,goals:renderGoalCenter,growth:renderGrowthTracker,priorities:renderSmartPriorities,brief:renderDailyBrief,district:renderDistrictWalkReady,settings:renderSettings};
+ if(renderers[current]) renderers[current]();
 }
 
 function latest(){return db.numbers.length?db.numbers.slice().sort((a,b)=>b.date.localeCompare(a.date))[0]:null}
@@ -316,7 +327,7 @@ function renderOpportunities(){
  document.getElementById('opportunities').innerHTML=`<div class="card"><h2>${edit.o?'Edit':'New'} Pro Opportunity</h2><div class="grid2">
  <label>Customer / Contractor<input id="o_customer" value="${esc(edit.o?.customer||'')}"></label>
  <label>Company / Account<input id="o_company" value="${esc(edit.o?.company||'')}"></label>
- <label>Opportunity Type<select id="o_type">${['Quote','Project','Install','Pro Account','Credit','Other'].map(x=>`<option ${edit.o?.type===x?'selected':''}>${x}</option>`).join('')}</select></label>
+ <label>Opportunity Type<select id="o_type">${['Quote','Project','Install','Services','Pro Account','Credit','Other'].map(x=>`<option ${edit.o?.type===x?'selected':''}>${x}</option>`).join('')}</select></label>
  <label>Estimated Sales<input id="o_sales" type="number" step=".01" value="${edit.o?.estimatedSales??''}"></label>
  <label>Stage<select id="o_stage" onchange="setOppProbability()">${['New','Contacted','Quoted','Follow-up','Won','Lost'].map(x=>`<option ${edit.o?.stage===x?'selected':''}>${x}</option>`).join('')}</select></label>
  <label>Probability %<input id="o_probability" type="number" min="0" max="100" step="5" value="${edit.o?.probability??10}"></label>
@@ -332,6 +343,17 @@ function setOppProbability(){const s=v('o_stage');const p=document.getElementByI
 function saveOpportunity(){const o={id:edit.o?.id||id(),date:edit.o?.date||dateToday(),customer:v('o_customer'),company:v('o_company'),type:v('o_type'),estimatedSales:+v('o_sales'),probability:Math.max(0,Math.min(100,+v('o_probability'))),stage:v('o_stage'),owner:v('o_owner'),nextFollowUp:v('o_follow'),source:v('o_source'),notes:v('o_notes')};if(!o.customer&&!o.company){alert('Enter a customer or company.');return}if(o.stage==='Won')o.probability=100;if(o.stage==='Lost')o.probability=0;upsert('opportunities',o);edit={};go('opportunities')}
 function editOpportunity(i){edit.o=db.opportunities.find(x=>x.id===i);go('opportunities')}
 function createOpportunityAction(i){const o=db.opportunities.find(x=>x.id===i);if(!o)return;const existing=db.actions.find(a=>a.opportunityId===o.id&&a.status!=='Complete');if(existing){edit.a=existing;go('actions');return}db.actions.push({id:id(),result:money(o.estimatedSales)+' estimated opportunity at '+o.stage,opportunity:(o.customer||o.company)+' — '+o.type,action:'Complete next follow-up and advance opportunity',owner:o.owner||'',goal:'Advance to next pipeline stage',due:o.nextFollowUp||dateToday(),status:'Open',source:'Opportunity Pipeline',sourceId:'Opportunity',opportunityId:o.id,associateId:''});save();go('actions')}
+function renderServicesInstall(){
+ const rows=db.opportunities.filter(o=>o.type==='Install'||o.type==='Project'||o.type==='Services');
+ const active=rows.filter(o=>!['Won','Lost'].includes(o.stage));
+ const won=rows.filter(o=>o.stage==='Won');
+ const pipeline=active.reduce((t,o)=>t+Number(o.estimatedSales||0),0);
+ const weighted=active.reduce((t,o)=>t+Number(o.estimatedSales||0)*(Number(o.probability||0)/100),0);
+ const wonSales=won.reduce((t,o)=>t+Number(o.estimatedSales||0),0);
+ const due=active.filter(o=>o.nextFollowUp&&o.nextFollowUp<=dateToday()).length;
+ const overdue=active.filter(o=>o.nextFollowUp&&o.nextFollowUp<dateToday()).length;
+ document.getElementById('services').innerHTML='<div class="card"><div class="row"><div><h2>Services & Install Tracker</h2><p class="small">Turn project and install opportunities into a managed pipeline with clear follow-up and ownership.</p></div><button class="btn green" onclick="go(\'opportunities\')">+ Add Service / Install Opportunity</button></div><div class="grid">'+metric('Active Projects',active.length)+metric('Open Pipeline',money(pipeline))+metric('Weighted Pipeline',money(weighted))+metric('Won / Install Sales',money(wonSales))+metric('Follow-ups Due',due,due?'watch':'good')+metric('Overdue Follow-ups',overdue,overdue?'bad':'good')+'</div></div><div class="card"><h2>Execution Pipeline</h2>'+(rows.length?'<table><tr><th>Customer / Project</th><th>Type</th><th>Stage</th><th>Sales</th><th>Probability</th><th>Follow-up</th><th>Owner</th><th></th></tr>'+rows.slice().sort((a,b)=>Number(b.estimatedSales||0)-Number(a.estimatedSales||0)).map(o=>{const over=!['Won','Lost'].includes(o.stage)&&o.nextFollowUp&&o.nextFollowUp<dateToday();return '<tr><td><b>'+esc(o.customer||o.company||'Project')+'</b><div class="small">'+esc(o.company||'')+'</div><div class="small">'+esc(o.notes||'')+'</div></td><td>'+esc(o.type)+'</td><td>'+esc(o.stage)+'</td><td>'+money(o.estimatedSales||0)+'</td><td>'+Number(o.probability||0)+'%</td><td class="'+(over?'bad':'')+'">'+(o.nextFollowUp?dateFmt(o.nextFollowUp):'—')+(over?' · OVERDUE':'')+'</td><td>'+esc(o.owner||'Unassigned')+'</td><td><button class="btn green" onclick="createOpportunityAction(\''+o.id+'\')">Create Action</button> <button class="btn gray" onclick="editOpportunity(\''+o.id+'\')">Edit</button></td></tr>'}).join('')+'</table>':'<div class="empty">No project, service, or install opportunities yet. Add them from the Opportunities tab.</div>')+'</div><div class="card"><h2>Service / Install Leadership Focus</h2><div class="grid2"><div class="metric"><small>Largest Active Project</small><strong style="font-size:16px">'+esc(active.slice().sort((a,b)=>Number(b.estimatedSales||0)-Number(a.estimatedSales||0))[0]?.customer||'None')+'</strong></div><div class="metric"><small>Next Management Move</small><strong style="font-size:16px">'+(overdue?'Clear overdue customer follow-ups first.':due?'Complete today’s project follow-ups.':'Build new project / install opportunities from Pro conversations.')+'</strong></div></div></div>';
+}
 function renderSettings(){
  document.getElementById('settings').innerHTML=`<div class="card"><h2>Backup / Restore</h2><p class="small">Your records are stored in this browser. Export a backup before changing computers or browsers.</p>
  <div class="actions"><button class="btn primary" onclick="exportData()">Export Backup</button><label class="btn gray" style="display:inline-block;cursor:pointer">Restore Backup<input type="file" accept=".json,application/json" style="display:none" onchange="restoreData(this)"></label><button class="btn red" onclick="clearAll()">Clear All Data</button></div></div>
