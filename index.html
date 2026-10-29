@@ -85,9 +85,10 @@ function renderDashboard(){
  ${metric('Pro Sales',money(n?.pro||0))}${metric('Pro Plan',money(n?.proPlan||0))}${metric('Pro Variance',money(variance(n?.pro,n?.proPlan)),cls(variance(n?.pro,n?.proPlan)))}
  ${metric('Pro Variance %',pct(variancePct(n?.pro,n?.proPlan)),cls(variancePct(n?.pro,n?.proPlan)))}${metric('Pro Credit',money(n?.credit||0))}${metric('Open / Overdue Actions',open+' / '+overdue,overdue?'bad':'')}
  </div></div>
+ <div class="card"><h2>Manager Focus</h2><div class="grid2"><div class="metric"><small>Trend</small><strong>${trendDirection()}</strong></div><div class="metric"><small>Recommended Focus</small><strong style="font-size:15px;line-height:1.35">${esc(autoOpportunity())}</strong></div></div></div>
  <div class="card"><h2>Quick Actions</h2><div class="actions">
  <button class="btn primary" onclick="go('numbers')">+ Enter Numbers</button><button class="btn primary" onclick="go('walks')">+ Daily Walk</button>
- <button class="btn primary" onclick="go('departments')">Departments</button><button class="btn primary" onclick="go('products')">Product Groups</button><button class="btn primary" onclick="go('actions')">Action Plan</button><button class="btn primary" onclick="go('specialists')">Specialists</button></div></div>
+ <button class="btn primary" onclick="go('departments')">Departments</button><button class="btn primary" onclick="go('products')">Product Groups</button><button class="btn primary" onclick="go('actions')">Action Plan</button><button class="btn primary" onclick="go('specialists')">Specialists</button><button class="btn green" onclick="addStarterDepartments()">Load Standard Departments</button><button class="btn green" onclick="makeBottomActions()">Auto-Create Bottom 5 Actions</button></div></div>
  <div class="grid2">
  <div class="card"><h2>Bottom Department Opportunities</h2>${depts.length?'<table><tr><th>Department</th><th>Variance</th><th>Pro Variance</th></tr>'+depts.map(d=>`<tr><td><b>${esc(d.name)}</b></td><td class="${cls(variancePct(d.sales,d.plan))}">${money(variance(d.sales,d.plan))} (${pct(variancePct(d.sales,d.plan))})</td><td class="${cls(variancePct(d.pro,d.proPlan))}">${money(variance(d.pro,d.proPlan))}</td></tr>`).join('')+'</table>':'<div class="empty">Add department numbers to see opportunities.</div>'}</div>
  <div class="card"><h2>Bottom Product-Group Opportunities</h2>${products.length?'<table><tr><th>Product Group</th><th>Variance</th><th>Priority</th></tr>'+products.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td class="${cls(variancePct(p.sales,p.plan))}">${money(variance(p.sales,p.plan))} (${pct(variancePct(p.sales,p.plan))})</td><td>${esc(p.priority)}</td></tr>`).join('')+'</table>':'<div class="empty">Add product-group numbers to see opportunities.</div>'}</div></div>
@@ -98,6 +99,33 @@ function renderDashboard(){
 }
 function metric(a,b,c=''){return `<div class="metric"><small>${a}</small><strong class="${c}">${b}</strong></div>`}
 
+function trendDirection(){
+ const w=db.numbers.slice().sort((a,b)=>a.date.localeCompare(b.date));
+ if(w.length<2)return 'Not enough history';
+ const a=w[w.length-2],b=w[w.length-1],d=variancePct(b.pro,b.proPlan)-variancePct(a.pro,a.proPlan);
+ return d>0?'Improving':d<0?'Declining':'Flat';
+}
+function autoOpportunity(){
+ const p=db.products.slice().sort((a,b)=>variancePct(a.sales,a.plan)-variancePct(b.sales,b.plan));
+ const d=db.departments.slice().sort((a,b)=>variancePct(a.pro,a.proPlan)-variancePct(b.pro,b.proPlan));
+ if(p.length&&variancePct(p[0].sales,p[0].plan)<0)return 'Focus on '+p[0].name+' — close the sales-plan gap and assign a measurable recovery action.';
+ if(d.length&&variancePct(d[0].pro,d[0].proPlan)<0)return 'Partner with '+d[0].name+' to recover Pro sales through specialist referrals and contractor outreach.';
+ return 'Enter department and product-group numbers to generate a focused opportunity.';
+}
+function makeBottomActions(){
+ const candidates=[
+  ...db.products.slice().sort((a,b)=>variancePct(a.sales,a.plan)-variancePct(b.sales,b.plan)).filter(x=>variancePct(x.sales,x.plan)<0).slice(0,5).map(x=>({opp:x.name+' product group recovery',action:x.notes||'Review sales gap, identify contractor opportunities, and create a recovery plan.',owner:'Pro Supervisor',due:dateToday(),status:'Open'})),
+  ...db.departments.slice().sort((a,b)=>variancePct(a.pro,a.proPlan)-variancePct(b.pro,b.proPlan)).filter(x=>variancePct(x.pro,x.proPlan)<0).slice(0,3).map(x=>({opp:x.name+' Pro sales recovery',action:x.notes||'Build a department partnership plan to increase Pro referrals and sales.',owner:'Pro Supervisor',due:dateToday(),status:'Open'}))
+ ];
+ let added=0;
+ candidates.forEach(a=>{if(!db.actions.some(x=>x.opportunity===a.opp&&x.status!=='Complete')){a.id=id();db.actions.push(a);added++}});
+ save();alert(added+' action plan(s) created from current opportunities.');go('actions');
+}
+function addStarterDepartments(){
+ const existing=new Set(db.departments.map(x=>x.name.toLowerCase()));
+ starterDepartments.forEach(name=>{if(!existing.has(name.toLowerCase()))db.departments.push({id:id(),name,sales:0,plan:0,pro:0,proPlan:0,notes:''})});
+ save();alert('Starter departments added. Enter their actual numbers next.');
+}
 function renderNumbers(){
  document.getElementById('numbers').innerHTML=`<div class="card"><h2>Store & Pro Numbers</h2>
  <div class="grid2"><label>Date<input id="n_date" type="date" value="${edit.n?.date||dateToday()}"></label><label>Total Store Sales<input id="n_store" type="number" step="0.01" value="${edit.n?.store??''}"></label>
