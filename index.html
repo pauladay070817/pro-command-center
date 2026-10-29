@@ -237,18 +237,33 @@ function editAction(i){edit.a=db.actions.find(x=>x.id===i);go('actions')}
 function renderWalks(){
  document.getElementById('walks').innerHTML=`<div class="card"><h2>${edit.w?'Edit':'New'} Daily Pro Walk</h2><div class="grid2">
  <label>Date<input id="w_date" type="date" value="${edit.w?.date||dateToday()}"></label><label>Owner<input id="w_owner" value="${esc(edit.w?.owner||'')}"></label>
+ <label>Associate<select id="w_associate"><option value="">Unassigned</option>${db.associates.map(x=>`<option value="${x.id}" ${edit.w?.associateId===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>
+ <label>Department<select id="w_dept"><option value="">Select department</option>${db.departments.map(d=>`<option ${edit.w?.department===d.name?'selected':''}>${esc(d.name)}</option>`).join('')}</select></label>
  <label>Result / Finding<textarea id="w_result">${esc(edit.w?.result||'')}</textarea></label><label>Opportunity<textarea id="w_opp">${esc(edit.w?.opportunity||'')}</textarea></label>
  <label>Action / Goal<textarea id="w_action">${esc(edit.w?.action||'')}</textarea></label><label>Follow-up<input id="w_follow" value="${esc(edit.w?.follow||'')}"></label>
+ <label>Follow-up Due<input id="w_due" type="date" value="${edit.w?.followDue||''}"></label>
  <label style="grid-column:1/-1">Photos<input id="w_photos" type="file" accept="image/*" multiple></label></div>
  ${edit.w?.photos?.length?`<div class="thumbs">${edit.w.photos.map(x=>`<img src="${x}">`).join('')}</div>`:''}
- <div class="actions"><button class="btn primary" onclick="saveWalk()">Save Walk</button><button class="btn gray" onclick="edit={};renderWalks()">Clear</button></div></div>
+ <div class="actions"><button class="btn primary" onclick="saveWalk()">Save Walk</button><button class="btn green" onclick="saveWalk(true)">Save Walk + Create Action</button><button class="btn gray" onclick="edit={};renderWalks()">Clear</button></div></div>
  <div class="card"><h2>Walk History</h2>${db.walks.length?db.walks.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(w=>`<div class="card" style="box-shadow:none;margin:0 0 10px"><div class="row"><b>${dateFmt(w.date)} — ${esc(w.owner)}</b><div><button class="btn gray" onclick="editWalk('${w.id}')">Edit</button> <button class="btn red" onclick="del('walks','${w.id}')">Delete</button></div></div><p><b>Associate:</b> ${esc(db.associates.find(a=>a.id===w.associateId)?.name||'Unassigned')} &nbsp; <b>Department:</b> ${esc(w.department||'')}</p><p><b>Finding:</b> ${esc(w.result)}</p><p><b>Opportunity:</b> ${esc(w.opportunity)}</p><p><b>Action:</b> ${esc(w.action)}</p><p><b>Follow-up:</b> ${esc(w.follow)}</p>${w.photos?.length?`<div class="thumbs">${w.photos.map(x=>`<img src="${x}">`).join('')}</div>`:''}</div>`).join(''):'<div class="empty">No walks yet.</div>'}</div>`;
 }
-async function saveWalk(){
+async function saveWalk(createAction=false){
  const files=[...document.getElementById('w_photos').files]; let photos=edit.w?.photos?[...edit.w.photos]:[];
  for(const f of files){try{photos.push(await readFile(f))}catch(e){}}
- const w={id:edit.w?.id||id(),date:v('w_date'),owner:v('w_owner'),associateId:v('w_associate'),department:v('w_dept'),result:v('w_result'),opportunity:v('w_opp'),action:v('w_action'),follow:v('w_follow'),photos};
- if(!w.date){alert('Enter a date.');return}upsert('walks',w);edit={};go('walks')
+ const w={id:edit.w?.id||id(),date:v('w_date'),owner:v('w_owner'),associateId:v('w_associate'),department:v('w_dept'),result:v('w_result'),opportunity:v('w_opp'),action:v('w_action'),follow:v('w_follow'),followDue:v('w_due'),photos};
+ if(!w.date){alert('Enter a date.');return}
+ if(createAction){
+  if(!w.associateId){alert('Select an associate before creating an action.');return}
+  if(!w.opportunity&&!w.action){alert('Enter an opportunity or action before creating an action plan.');return}
+ }
+ upsert('walks',w);
+ if(createAction){
+  const existing=db.actions.find(a=>a.source==='Daily Walk'&&a.sourceId===w.id);
+  const assoc=db.associates.find(a=>a.id===w.associateId);
+  const action={id:existing?.id||id(),result:w.result,opportunity:w.opportunity||'Daily walk follow-up',action:w.action||'Complete follow-up from daily walk',owner:assoc?.name||w.owner,goal:w.follow||'Complete follow-up and verify improvement',due:w.followDue||dateToday(),status:existing?.status||'Open',source:'Daily Walk',sourceId:w.id,associateId:w.associateId};
+  if(existing){Object.assign(existing,action)}else db.actions.push(action);
+ }
+ edit={};save();go(createAction?'actions':'walks')
 }
 function editWalk(i){edit.w=db.walks.find(x=>x.id===i);go('walks')}
 function readFile(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)})}
