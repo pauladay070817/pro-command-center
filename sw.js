@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pro-command-center-v2';
+const CACHE_NAME = 'pro-command-center-v4';
 
 const APP_FILES = [
   './',
