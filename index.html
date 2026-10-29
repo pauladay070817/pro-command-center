@@ -37,6 +37,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:9px;bord
 <section id="products" class="page"></section>
 <section id="actions" class="page"></section>
 <section id="walks" class="page"></section>
+<section id="photos" class="page"></section>
 <section id="opportunities" class="page"></section>
 <section id="services" class="page"></section>
 <section id="deliveries" class="page"></section>
@@ -55,7 +56,7 @@ const KEY='proCommandCenterV4';
 const TAB=[
  ['dashboard','Dashboard'],['numbers','Numbers'],['specialists','Specialists'],
  ['departments','Departments'],['products','Product Groups'],['associates','Associates'],['actions','Action Plans'],
- ['walks','Daily Walks'],['opportunities','Opportunities'],['services','Services & Install'],['deliveries','Delivery & Execution'],['customers','Customers'],['quotes','Quotes / MVD'],['credit','Credit Growth'],['goals','Goals & KPIs'],['growth','Growth Tracker'],['priorities','Daily Priorities'],['brief','Daily Brief'],['district','District Walk'],['settings','Backup']
+ ['walks','Daily Walks'],['photos','Photo Intelligence'],['opportunities','Opportunities'],['services','Services & Install'],['deliveries','Delivery & Execution'],['customers','Customers'],['quotes','Quotes / MVD'],['credit','Credit Growth'],['goals','Goals & KPIs'],['growth','Growth Tracker'],['priorities','Daily Priorities'],['brief','Daily Brief'],['district','District Walk'],['settings','Backup']
 ];
 const starterDepartments=['Pro','Lumber','Building Materials','Millwork','Hardware','Electrical','Plumbing','Flooring','Paint','Garden','Tools','Appliances'];
 let db=load(), current='dashboard', edit={};
@@ -79,7 +80,7 @@ function go(id){current=id;render()}
 function render(){
  nav();
  document.querySelectorAll('.page').forEach(x=>x.classList.toggle('active',x.id===current));
- const renderers={dashboard:renderDashboard,numbers:renderNumbers,specialists:renderSpecialists,departments:renderDepartments,products:renderProducts,associates:renderAssociates,actions:renderActions,walks:renderWalks,opportunities:renderOpportunities,services:renderServicesInstall,deliveries:renderDeliveryTracker,customers:renderCustomerTracker,quotes:renderQuoteTracker,credit:renderCreditTracker,goals:renderGoalCenter,growth:renderGrowthTracker,priorities:renderSmartPriorities,brief:renderDailyBrief,district:renderDistrictWalkReady,settings:renderSettings};
+ const renderers={dashboard:renderDashboard,numbers:renderNumbers,specialists:renderSpecialists,departments:renderDepartments,products:renderProducts,associates:renderAssociates,actions:renderActions,walks:renderWalks,photos:renderPhotoIntelligence,opportunities:renderOpportunities,services:renderServicesInstall,deliveries:renderDeliveryTracker,customers:renderCustomerTracker,quotes:renderQuoteTracker,credit:renderCreditTracker,goals:renderGoalCenter,growth:renderGrowthTracker,priorities:renderSmartPriorities,brief:renderDailyBrief,district:renderDistrictWalkReady,settings:renderSettings};
  if(renderers[current]) renderers[current]();
 }
 
@@ -318,6 +319,14 @@ async function saveWalk(createAction=false){
 function editWalk(i){edit.w=db.walks.find(x=>x.id===i);go('walks')}
 function readFile(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)})}
 
+function renderPhotoIntelligence(){
+ const walks=db.walks.slice().filter(w=>w.photos&&w.photos.length).sort((a,b)=>b.date.localeCompare(a.date));
+ const photos=walks.reduce((t,w)=>t+w.photos.length,0);
+ const associates=[...new Set(walks.map(w=>w.associateId).filter(Boolean))];
+ const depts=[...new Set(walks.map(w=>w.department).filter(Boolean))];
+ const recent=walks.filter(w=>w.date>=new Date(Date.now()-7*86400000).toISOString().slice(0,10)).length;
+ document.getElementById('photos').innerHTML='<div class="card"><div class="row"><div><h2>Photo Intelligence & Daily Image Tracker</h2><p class="small">Use walk photos as evidence of conditions, opportunities and follow-through—not just documentation.</p></div><button class="btn primary" onclick="go(\'walks\')">+ Add Photos From Daily Walk</button></div><div class="grid">'+metric('Walks With Photos',walks.length)+metric('Photos Captured',photos)+metric('Associates Documented',associates.length)+metric('Departments Documented',depts.length)+metric('Last 7 Days',recent,recent?'good':'watch')+'</div></div><div class="card"><h2>Photo Evidence Log</h2>'+(walks.length?'<table><tr><th>Date</th><th>Associate</th><th>Department</th><th>Finding</th><th>Opportunity / Action</th><th>Photos</th></tr>'+walks.map(w=>'<tr><td>'+dateFmt(w.date)+'</td><td>'+esc(db.associates.find(a=>a.id===w.associateId)?.name||w.owner||'Unassigned')+'</td><td>'+esc(w.department||'')+'</td><td>'+esc(w.result||'')+'</td><td><b>'+esc(w.opportunity||'')+'</b><div class="small">'+esc(w.action||'')+'</div></td><td><div class="thumbs">'+w.photos.map(p=>'<img src="'+p+'" alt="Walk photo">').join('')+'</div></td></tr>').join('')+'</table>':'<div class="empty">No walk photos have been captured yet. Add photos through Daily Walks.</div>')+'</div><div class="card"><h2>Leadership Use</h2><div class="grid2"><div class="metric"><small>Accountability</small><strong style="font-size:15px">Compare the photographed condition with the walk finding and assigned action.</strong></div><div class="metric"><small>Follow-through</small><strong style="font-size:15px">Use repeat photos to verify whether an opportunity improved after coaching or action.</strong></div><div class="metric"><small>District Walk</small><strong style="font-size:15px">Use visual evidence to support wins, gaps and action-plan discussions.</strong></div><div class="metric"><small>Best Practice</small><strong style="font-size:15px">Capture consistent before / after evidence for important Pro opportunities.</strong></div></div></div>';
+}
 function opportunityProbability(stage){return ({New:10,Contacted:25,Quoted:50,'Follow-up':70,Won:100,Lost:0}[stage]??10)}
 function renderOpportunities(){
  const rows=db.opportunities.slice().sort((a,b)=>(a.nextFollowUp||'9999').localeCompare(b.nextFollowUp||'9999'));
