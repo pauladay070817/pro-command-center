@@ -37,6 +37,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:9px;bord
 <section id="products" class="page"></section>
 <section id="actions" class="page"></section>
 <section id="walks" class="page"></section>
+<section id="opportunities" class="page"></section>
 <section id="settings" class="page"></section>
 </main>
 <script>
@@ -44,12 +45,12 @@ const KEY='proCommandCenterV4';
 const TAB=[
  ['dashboard','Dashboard'],['numbers','Numbers'],['specialists','Specialists'],
  ['departments','Departments'],['products','Product Groups'],['associates','Associates'],['actions','Action Plans'],
- ['walks','Daily Walks'],['settings','Backup']
+ ['walks','Daily Walks'],['opportunities','Opportunities'],['settings','Backup']
 ];
 const starterDepartments=['Pro','Lumber','Building Materials','Millwork','Hardware','Electrical','Plumbing','Flooring','Paint','Garden','Tools','Appliances'];
 let db=load(), current='dashboard', edit={};
 
-function blank(){return {numbers:[],specialists:[],departments:[],products:[],associates:[],actions:[],walks:[]}}
+function blank(){return {numbers:[],specialists:[],departments:[],products:[],associates:[],actions:[],walks:[],opportunities:[]}}
 function load(){try{return Object.assign(blank(),JSON.parse(localStorage.getItem(KEY)||'{}'))}catch(e){return blank()}}
 function save(){localStorage.setItem(KEY,JSON.stringify(db));render()}
 function id(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
@@ -67,7 +68,7 @@ function go(id){current=id;render()}
 
 function render(){
  nav();document.querySelectorAll('.page').forEach(x=>x.classList.toggle('active',x.id===current));
- ({dashboard:renderDashboard,numbers:renderNumbers,specialists:renderSpecialists,departments:renderDepartments,products:renderProducts,associates:renderAssociates,actions:renderActions,walks:renderWalks,settings:renderSettings}[current])();
+ ({dashboard:renderDashboard,numbers:renderNumbers,specialists:renderSpecialists,departments:renderDepartments,products:renderProducts,associates:renderAssociates,actions:renderActions,walks:renderWalks,opportunities:renderOpportunities,settings:renderSettings}[current])();
 }
 
 function latest(){return db.numbers.length?db.numbers.slice().sort((a,b)=>b.date.localeCompare(a.date))[0]:null}
@@ -95,10 +96,10 @@ function renderDashboard(){
  ${metric('Associate Accountability',associateAccountability(),scoreClass(associateAccountability()))}
  ${metric('Specialist Attainment',specialistAttainment(),scoreClass(specialistAttainment()))}
  </div><div class="small" style="margin-top:10px">Use this scorecard to run the business: know the gap, assign the owner, set the due date, follow up, and verify the result.</div></div>
- <div class="card"><h2>Today's Leadership Priorities</h2>${renderLeadershipPriorities()}</div>
+ <div class="card"><h2>Opportunity Pipeline</h2>${renderPipelineDashboard()}</div><div class="card"><h2>Today's Leadership Priorities</h2>${renderLeadershipPriorities()}</div>
  <div class="card"><h2>Quick Actions</h2><div class="actions">
  <button class="btn primary" onclick="go('numbers')">+ Enter Numbers</button><button class="btn primary" onclick="go('walks')">+ Daily Walk</button>
- <button class="btn primary" onclick="go('departments')">Departments</button><button class="btn primary" onclick="go('products')">Product Groups</button><button class="btn primary" onclick="go('actions')">Action Plan</button><button class="btn primary" onclick="go('specialists')">Specialists</button><button class="btn primary" onclick="go('associates')">Associates</button><button class="btn green" onclick="addStarterDepartments()">Load Standard Departments</button><button class="btn green" onclick="makeBottomActions()">Auto-Create Bottom 5 Actions</button></div></div>
+ <button class="btn primary" onclick="go('departments')">Departments</button><button class="btn primary" onclick="go('products')">Product Groups</button><button class="btn primary" onclick="go('actions')">Action Plan</button><button class="btn primary" onclick="go('specialists')">Specialists</button><button class="btn primary" onclick="go('associates')">Associates</button><button class="btn green" onclick="go('opportunities')">+ Opportunity</button><button class="btn green" onclick="addStarterDepartments()">Load Standard Departments</button><button class="btn green" onclick="makeBottomActions()">Auto-Create Bottom 5 Actions</button></div></div>
  <div class="grid2">
  <div class="card"><h2>Bottom Department Opportunities</h2>${depts.length?'<table><tr><th>Department</th><th>Variance</th><th>Pro Variance</th></tr>'+depts.map(d=>`<tr><td><b>${esc(d.name)}</b></td><td class="${cls(variancePct(d.sales,d.plan))}">${money(variance(d.sales,d.plan))} (${pct(variancePct(d.sales,d.plan))})</td><td class="${cls(variancePct(d.pro,d.proPlan))}">${money(variance(d.pro,d.proPlan))}</td></tr>`).join('')+'</table>':'<div class="empty">Add department numbers to see opportunities.</div>'}</div>
  <div class="card"><h2>Bottom Product-Group Opportunities</h2>${products.length?'<table><tr><th>Product Group</th><th>Variance</th><th>Priority</th></tr>'+products.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td class="${cls(variancePct(p.sales,p.plan))}">${money(variance(p.sales,p.plan))} (${pct(variancePct(p.sales,p.plan))})</td><td>${esc(p.priority)}</td></tr>`).join('')+'</table>':'<div class="empty">Add product-group numbers to see opportunities.</div>'}</div></div>
@@ -116,7 +117,8 @@ function actionCompletion(){if(!db.actions.length)return '—';return pct((db.ac
 function followUpDiscipline(){const due=db.actions.filter(a=>a.due);if(!due.length)return '—';const onTime=due.filter(a=>a.status==='Complete').length;return pct((onTime/due.length)*100)}
 function associateAccountability(){if(!db.associates.length)return '—';const healthy=db.associates.filter(a=>{const open=db.actions.filter(x=>x.associateId===a.id&&x.status!=='Complete');const over=open.some(x=>x.due&&x.due<dateToday());return a.status!=='Needs Coaching'&&!over}).length;return pct((healthy/db.associates.length)*100)}
 function specialistAttainment(){if(!db.specialists.length)return '—';const good=db.specialists.filter(s=>Number(s.plan)>0&&Number(s.sales)>=Number(s.plan)).length;return pct((good/db.specialists.length)*100)}
-function renderLeadershipPriorities(){const items=[];const n=latest();if(n&&variance(n.pro,n.proPlan)<0)items.push({title:'Close the Pro sales gap',detail:'Pro is '+money(Math.abs(variance(n.pro,n.proPlan)))+' below plan. Build today\'s recovery actions.'});db.actions.filter(a=>a.status!=='Complete'&&a.due&&a.due<dateToday()).slice(0,3).forEach(a=>items.push({title:'Resolve overdue action: '+a.opportunity,detail:'Owner: '+(a.owner||'Unassigned')+' · Due '+dateFmt(a.due)}));db.associates.filter(a=>a.status==='Needs Coaching').slice(0,3).forEach(a=>items.push({title:'Coach '+a.name,detail:a.goal||'Review expectations, action ownership, and next follow-up.'}));db.specialists.filter(s=>variance(s.sales,s.plan)<0).slice(0,3).forEach(s=>items.push({title:'Specialist recovery: '+s.name,detail:money(Math.abs(variance(s.sales,s.plan)))+' below plan.'}));if(!items.length)return '<div class="empty">No immediate red flags. Keep prospecting, coaching, and protecting the plan.</div>';return '<div class="grid2">'+items.slice(0,6).map(x=>'<div class="metric"><small>Priority</small><strong style="font-size:15px;line-height:1.35">'+esc(x.title)+'</strong><div class="small" style="margin-top:6px">'+esc(x.detail)+'</div></div>').join('')+'</div>'}
+function renderPipelineDashboard(){const open=db.opportunities.filter(o=>!['Won','Lost'].includes(o.stage));const pipeline=open.reduce((s,o)=>s+Number(o.estimatedSales||0),0);const weighted=open.reduce((s,o)=>s+Number(o.estimatedSales||0)*(Number(o.probability||0)/100),0);const due=open.filter(o=>o.nextFollowUp&&o.nextFollowUp<=dateToday()).length;const won=db.opportunities.filter(o=>o.stage==='Won').reduce((s,o)=>s+Number(o.estimatedSales||0),0);const rows=open.slice().sort((a,b)=>(b.estimatedSales||0)-(a.estimatedSales||0)).slice(0,5);return '<div class="grid">'+metric('Open Pipeline',money(pipeline))+metric('Weighted Pipeline',money(weighted))+metric('Follow-ups Due',due,due?'bad':'good')+metric('Won Opportunity Sales',money(won),'good')+'</div>'+(rows.length?'<table style="margin-top:12px"><tr><th>Customer / Company</th><th>Type</th><th>Stage</th><th>Est. Sales</th><th>Follow-up</th></tr>'+rows.map(o=>'<tr><td><b>'+esc(o.customer||'Unnamed')+'</b><div class="small">'+esc(o.company||'')+'</div></td><td>'+esc(o.type)+'</td><td>'+esc(o.stage)+'</td><td>'+money(o.estimatedSales)+'</td><td class="'+(o.nextFollowUp&&o.nextFollowUp<=dateToday()?'bad':'')+'">'+(o.nextFollowUp?dateFmt(o.nextFollowUp):'—')+'</td></tr>').join('')+'</table>':'<div class="empty" style="margin-top:10px">No active opportunities yet. Start building your Pro pipeline.</div>')+'<div class="actions"><button class="btn primary" onclick="go(\'opportunities\')">Open Opportunity Pipeline</button></div>'}
+function renderLeadershipPriorities(){const items=[];const n=latest();if(n&&variance(n.pro,n.proPlan)<0)items.push({title:'Close the Pro sales gap',detail:'Pro is '+money(Math.abs(variance(n.pro,n.proPlan)))+' below plan. Build today\'s recovery actions.'});db.actions.filter(a=>a.status!=='Complete'&&a.due&&a.due<dateToday()).slice(0,3).forEach(a=>items.push({title:'Resolve overdue action: '+a.opportunity,detail:'Owner: '+(a.owner||'Unassigned')+' · Due '+dateFmt(a.due)}));db.associates.filter(a=>a.status==='Needs Coaching').slice(0,3).forEach(a=>items.push({title:'Coach '+a.name,detail:a.goal||'Review expectations, action ownership, and next follow-up.'}));db.specialists.filter(s=>variance(s.sales,s.plan)<0).slice(0,3).forEach(s=>items.push({title:'Specialist recovery: '+s.name,detail:money(Math.abs(variance(s.sales,s.plan)))+' below plan.'}));db.opportunities.filter(o=>!['Won','Lost'].includes(o.stage)&&o.nextFollowUp&&o.nextFollowUp<=dateToday()).slice(0,3).forEach(o=>items.push({title:'Opportunity follow-up: '+(o.customer||o.company||'Unnamed'),detail:'Due '+dateFmt(o.nextFollowUp)+' · '+money(o.estimatedSales)+' estimated.'}));if(!items.length)return '<div class="empty">No immediate red flags. Keep prospecting, coaching, and protecting the plan.</div>';return '<div class="grid2">'+items.slice(0,6).map(x=>'<div class="metric"><small>Priority</small><strong style="font-size:15px;line-height:1.35">'+esc(x.title)+'</strong><div class="small" style="margin-top:6px">'+esc(x.detail)+'</div></div>').join('')+'</div>'}
 function trendDirection(){
  const w=db.numbers.slice().sort((a,b)=>a.date.localeCompare(b.date));
  if(w.length<2)return 'Not enough history';
@@ -285,10 +287,36 @@ async function saveWalk(createAction=false){
 function editWalk(i){edit.w=db.walks.find(x=>x.id===i);go('walks')}
 function readFile(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)})}
 
+function opportunityProbability(stage){return ({New:10,Contacted:25,Quoted:50,'Follow-up':70,Won:100,Lost:0}[stage]??10)}
+function renderOpportunities(){
+ const rows=db.opportunities.slice().sort((a,b)=>(a.nextFollowUp||'9999').localeCompare(b.nextFollowUp||'9999'));
+ const open=db.opportunities.filter(o=>!['Won','Lost'].includes(o.stage));
+ const pipeline=open.reduce((s,o)=>s+Number(o.estimatedSales||0),0);
+ const weighted=open.reduce((s,o)=>s+Number(o.estimatedSales||0)*(Number(o.probability||0)/100),0);
+ const due=open.filter(o=>o.nextFollowUp&&o.nextFollowUp<=dateToday()).length;
+ document.getElementById('opportunities').innerHTML=`<div class="card"><h2>${edit.o?'Edit':'New'} Pro Opportunity</h2><div class="grid2">
+ <label>Customer / Contractor<input id="o_customer" value="${esc(edit.o?.customer||'')}"></label>
+ <label>Company / Account<input id="o_company" value="${esc(edit.o?.company||'')}"></label>
+ <label>Opportunity Type<select id="o_type">${['Quote','Project','Install','Pro Account','Credit','Other'].map(x=>`<option ${edit.o?.type===x?'selected':''}>${x}</option>`).join('')}</select></label>
+ <label>Estimated Sales<input id="o_sales" type="number" step=".01" value="${edit.o?.estimatedSales??''}"></label>
+ <label>Stage<select id="o_stage" onchange="setOppProbability()">${['New','Contacted','Quoted','Follow-up','Won','Lost'].map(x=>`<option ${edit.o?.stage===x?'selected':''}>${x}</option>`).join('')}</select></label>
+ <label>Probability %<input id="o_probability" type="number" min="0" max="100" step="5" value="${edit.o?.probability??10}"></label>
+ <label>Owner<input id="o_owner" value="${esc(edit.o?.owner||'')}"></label>
+ <label>Next Follow-up<input id="o_follow" type="date" value="${edit.o?.nextFollowUp||''}"></label>
+ <label>Source<input id="o_source" value="${esc(edit.o?.source||'Walk-in / Referral')}"></label>
+ <label style="grid-column:1/-1">Notes<textarea id="o_notes">${esc(edit.o?.notes||'')}</textarea></label></div>
+ <div class="actions"><button class="btn primary" onclick="saveOpportunity()">Save Opportunity</button><button class="btn gray" onclick="edit={};renderOpportunities()">Clear</button></div></div>
+ <div class="card"><h2>Pipeline Scorecard</h2><div class="grid">${metric('Open Pipeline',money(pipeline))}${metric('Weighted Pipeline',money(weighted))}${metric('Follow-ups Due',due,due?'bad':'good')}${metric('Total Opportunities',db.opportunities.length)}</div></div>
+ <div class="card"><h2>Opportunity Pipeline</h2>${rows.length?`<table><tr><th>Customer / Company</th><th>Type</th><th>Stage</th><th>Est. Sales</th><th>Probability</th><th>Follow-up</th><th>Owner</th><th></th></tr>${rows.map(o=>{const overdue=!['Won','Lost'].includes(o.stage)&&o.nextFollowUp&&o.nextFollowUp<dateToday();return `<tr><td><b>${esc(o.customer||'Unnamed')}</b><div class="small">${esc(o.company||'')}</div><div class="small">${esc(o.notes||'')}</div></td><td>${esc(o.type)}</td><td>${esc(o.stage)}</td><td>${money(o.estimatedSales)}</td><td>${Number(o.probability||0)}%</td><td class="${overdue?'bad':''}">${o.nextFollowUp?dateFmt(o.nextFollowUp):'—'}${overdue?' · OVERDUE':''}</td><td>${esc(o.owner||'Unassigned')}</td><td><button class="btn green" onclick="createOpportunityAction('${o.id}')">Action</button> <button class="btn gray" onclick="editOpportunity('${o.id}')">Edit</button> <button class="btn red" onclick="del('opportunities','${o.id}')">Delete</button></td></tr>`}).join('')}</table>`:'<div class="empty">No opportunities yet. Add your first contractor/project opportunity above.</div>'}</div>`;
+}
+function setOppProbability(){const s=v('o_stage');const p=document.getElementById('o_probability');if(p&&!edit.o)p.value=opportunityProbability(s)}
+function saveOpportunity(){const o={id:edit.o?.id||id(),date:edit.o?.date||dateToday(),customer:v('o_customer'),company:v('o_company'),type:v('o_type'),estimatedSales:+v('o_sales'),probability:Math.max(0,Math.min(100,+v('o_probability'))),stage:v('o_stage'),owner:v('o_owner'),nextFollowUp:v('o_follow'),source:v('o_source'),notes:v('o_notes')};if(!o.customer&&!o.company){alert('Enter a customer or company.');return}if(o.stage==='Won')o.probability=100;if(o.stage==='Lost')o.probability=0;upsert('opportunities',o);edit={};go('opportunities')}
+function editOpportunity(i){edit.o=db.opportunities.find(x=>x.id===i);go('opportunities')}
+function createOpportunityAction(i){const o=db.opportunities.find(x=>x.id===i);if(!o)return;const existing=db.actions.find(a=>a.opportunityId===o.id&&a.status!=='Complete');if(existing){edit.a=existing;go('actions');return}db.actions.push({id:id(),result:money(o.estimatedSales)+' estimated opportunity at '+o.stage,opportunity:(o.customer||o.company)+' — '+o.type,action:'Complete next follow-up and advance opportunity',owner:o.owner||'',goal:'Advance to next pipeline stage',due:o.nextFollowUp||dateToday(),status:'Open',source:'Opportunity Pipeline',sourceId:'Opportunity',opportunityId:o.id,associateId:''});save();go('actions')}
 function renderSettings(){
  document.getElementById('settings').innerHTML=`<div class="card"><h2>Backup / Restore</h2><p class="small">Your records are stored in this browser. Export a backup before changing computers or browsers.</p>
  <div class="actions"><button class="btn primary" onclick="exportData()">Export Backup</button><label class="btn gray" style="display:inline-block;cursor:pointer">Restore Backup<input type="file" accept=".json,application/json" style="display:none" onchange="restoreData(this)"></label><button class="btn red" onclick="clearAll()">Clear All Data</button></div></div>
- <div class="card"><h2>Current Record Counts</h2><div class="grid">${metric('Numbers',db.numbers.length)}${metric('Specialists',db.specialists.length)}${metric('Departments',db.departments.length)}${metric('Product Groups',db.products.length)}${metric('Associates',db.associates.length)}${metric('Actions',db.actions.length)}${metric('Daily Walks',db.walks.length)}</div></div>`;
+ <div class="card"><h2>Current Record Counts</h2><div class="grid">${metric('Numbers',db.numbers.length)}${metric('Specialists',db.specialists.length)}${metric('Departments',db.departments.length)}${metric('Product Groups',db.products.length)}${metric('Associates',db.associates.length)}${metric('Actions',db.actions.length)}${metric('Daily Walks',db.walks.length)}${metric('Opportunities',db.opportunities.length)}</div></div>`;
 }
 function exportData(){const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='pro-command-center-backup-'+dateToday()+'.json';a.click();URL.revokeObjectURL(a.href)}
 function restoreData(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{db=Object.assign(blank(),JSON.parse(r.result));save();alert('Backup restored.')}catch(e){alert('That backup could not be read.')}};r.readAsText(f)}
