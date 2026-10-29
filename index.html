@@ -141,25 +141,48 @@ function saveNumber(){
 }
 function editNumber(i){edit.n=db.numbers.find(x=>x.id===i);go('numbers')}
 
+function specialistScore(s){
+ const v=variancePct(s.sales,s.plan);
+ return Math.max(0,Math.min(100,50+v));
+}
+function specialistRankRows(){
+ return db.specialists.slice().sort((a,b)=>specialistScore(b)-specialistScore(a));
+}
+function makeSpecialistActions(){
+ let added=0;
+ db.specialists.filter(s=>variance(s.sales,s.plan)<0).forEach(s=>{
+  const opp=s.name+' specialist recovery';
+  if(!db.actions.some(a=>a.opportunity===opp&&a.status!=='Complete')){
+   db.actions.push({id:id(),result:money(s.sales)+' sales vs '+money(s.plan)+' plan',opportunity:opp,action:'Review pipeline, contractor follow-up, quotes and next-step commitments.',owner:s.name,goal:'Return to plan',due:dateToday(),status:'Open',source:'Specialist',sourceId:s.id}); added++;
+  }
+ });
+ save(); alert(added+' specialist action plan(s) created.'); go('actions');
+}
 function renderSpecialists(){
+ const ranked=specialistRankRows();
  document.getElementById('specialists').innerHTML=`<div class="card"><h2>${edit.s?'Edit':'Add'} Specialist</h2><div class="grid2">
  <label>Name<input id="s_name" value="${esc(edit.s?.name||'')}"></label><label>Sales<input id="s_sales" type="number" step=".01" value="${edit.s?.sales??''}"></label>
  <label>Sales Plan<input id="s_plan" type="number" step=".01" value="${edit.s?.plan??''}"></label><label>Goal<input id="s_goal" value="${esc(edit.s?.goal||'')}"></label>
  <label style="grid-column:1/-1">Notes / Opportunity<textarea id="s_notes">${esc(edit.s?.notes||'')}</textarea></label></div>
- <div class="actions"><button class="btn primary" onclick="saveSpecialist()">Save Specialist</button><button class="btn gray" onclick="edit={};renderSpecialists()">Clear</button></div></div>
- <div class="card"><h2>Specialist Scoreboard</h2>${db.specialists.length?`<table><tr><th>Name</th><th>Sales</th><th>Plan</th><th>Variance</th><th>Goal</th><th></th></tr>${db.specialists.map(s=>`<tr><td><b>${esc(s.name)}</b><div class="small">${esc(s.notes)}</div></td><td>${money(s.sales)}</td><td>${money(s.plan)}</td><td class="${cls(variance(s.sales,s.plan))}">${money(variance(s.sales,s.plan))} (${pct(variancePct(s.sales,s.plan))})</td><td>${esc(s.goal)}</td><td><button class="btn gray" onclick="editSpecialist('${s.id}')">Edit</button> <button class="btn red" onclick="del('specialists','${s.id}')">Delete</button></td></tr>`).join('')}</table>`:'<div class="empty">No specialists entered.</div>'}</div>`;
+ <div class="actions"><button class="btn primary" onclick="saveSpecialist()">Save Specialist</button><button class="btn green" onclick="makeSpecialistActions()">Create Actions for Specialists Below Plan</button><button class="btn gray" onclick="edit={};renderSpecialists()">Clear</button></div></div>
+ <div class="card"><h2>Specialist Scoreboard</h2>${ranked.length?`<table><tr><th>Rank</th><th>Name</th><th>Sales</th><th>Plan</th><th>Variance</th><th>Goal</th><th></th></tr>${ranked.map((s,i)=>`<tr><td><b>#${i+1}</b></td><td><b>${esc(s.name)}</b><div class="small">${esc(s.notes)}</div></td><td>${money(s.sales)}</td><td>${money(s.plan)}</td><td class="${cls(variancePct(s.sales,s.plan))}">${money(variance(s.sales,s.plan))} (${pct(variancePct(s.sales,s.plan))})</td><td>${esc(s.goal)}</td><td><button class="btn gray" onclick="editSpecialist('${s.id}')">Edit</button> <button class="btn red" onclick="del('specialists','${s.id}')">Delete</button></td></tr>`).join('')}</table>`:'<div class="empty">No specialists entered.</div>'}</div>`;
 }
 function saveSpecialist(){const s={id:edit.s?.id||id(),name:v('s_name'),sales:+v('s_sales'),plan:+v('s_plan'),goal:v('s_goal'),notes:v('s_notes')};if(!s.name){alert('Enter a specialist name.');return}upsert('specialists',s);edit={};go('specialists')}
 function editSpecialist(i){edit.s=db.specialists.find(x=>x.id===i);go('specialists')}
 
+function addDepartmentFromOpportunity(i){
+ const d=db.departments.find(x=>x.id===i); if(!d)return;
+ db.actions.push({id:id(),result:money(d.pro)+' Pro sales vs '+money(d.proPlan)+' plan',opportunity:d.name+' Pro opportunity',action:d.notes||'Partner with department associates to identify contractor opportunities and referrals.',owner:'Pro Supervisor',goal:'Improve Pro sales vs plan',due:dateToday(),status:'Open',source:'Department',sourceId:d.id});
+ save();go('actions');
+}
 function renderDepartments(){
  const rows=db.departments.length?db.departments:starterDepartments.map(name=>({id:'starter-'+name,name,sales:0,plan:0,pro:0,proPlan:0,notes:''}));
  document.getElementById('departments').innerHTML=`<div class="card"><h2>${edit.d?'Edit':'Add'} Department</h2><div class="grid2">
  <label>Department<input id="d_name" value="${esc(edit.d?.name||'')}"></label><label>Sales<input id="d_sales" type="number" step=".01" value="${edit.d?.sales??''}"></label>
  <label>Sales Plan<input id="d_plan" type="number" step=".01" value="${edit.d?.plan??''}"></label><label>Pro Sales<input id="d_pro" type="number" step=".01" value="${edit.d?.pro??''}"></label>
  <label>Pro Sales Plan<input id="d_proPlan" type="number" step=".01" value="${edit.d?.proPlan??''}"></label><label>Opportunity Notes<input id="d_notes" value="${esc(edit.d?.notes||'')}"></label></div>
- <div class="actions"><button class="btn primary" onclick="saveDepartment()">Save Department</button><button class="btn gray" onclick="edit={};renderDepartments()">Clear</button></div></div>
- <div class="card"><h2>Departments</h2><table><tr><th>Department</th><th>Sales Var</th><th>Pro Var</th><th>Opportunity</th><th></th></tr>${rows.map(d=>`<tr><td><b>${esc(d.name)}</b></td><td class="${cls(variance(d.sales,d.plan))}">${money(variance(d.sales,d.plan))}</td><td class="${cls(variance(d.pro,d.proPlan))}">${money(variance(d.pro,d.proPlan))}</td><td>${esc(d.notes||'')}</td><td>${d.id.startsWith('starter-')?'':`<button class="btn gray" onclick="editDepartment('${d.id}')">Edit</button> <button class="btn red" onclick="del('departments','${d.id}')">Delete</button>`}</td></tr>`).join('')}</table></div>`;
+ <div class="actions"><button class="btn primary" onclick="saveDepartment()">Save Department</button><button class="btn green" onclick="addStarterDepartments()">Load Standard Departments</button><button class="btn gray" onclick="edit={};renderDepartments()">Clear</button></div></div>
+ <div class="card"><h2>Department Performance</h2><table><tr><th>Department</th><th>Sales Var</th><th>Pro Var</th><th>Opportunity</th><th>Action</th></tr>${rows.map(d=>`<tr><td><b>${esc(d.name)}</b></td><td class="${cls(variancePct(d.sales,d.plan))}">${money(variance(d.sales,d.plan))} (${pct(variancePct(d.sales,d.plan))})</td><td class="${cls(variancePct(d.pro,d.proPlan))}">${money(variance(d.pro,d.proPlan))} (${pct(variancePct(d.pro,d.proPlan))})</td><td>${esc(d.notes||'')}</td><td>${d.id.startsWith('starter-')?'—':`<button class="btn green" onclick="addDepartmentFromOpportunity('${d.id}')">Create Action</button> <button class="btn gray" onclick="editDepartment('${d.id}')">Edit</button> <button class="btn red" onclick="del('departments','${d.id}')">Delete</button>`}</td></tr>`).join('')}</table></div>`;
 }
 function saveDepartment(){const d={id:edit.d?.id||id(),name:v('d_name'),sales:+v('d_sales'),plan:+v('d_plan'),pro:+v('d_pro'),proPlan:+v('d_proPlan'),notes:v('d_notes')};if(!d.name){alert('Enter a department.');return}upsert('departments',d);edit={};go('departments')}
 function editDepartment(i){edit.d=db.departments.find(x=>x.id===i);go('departments')}
