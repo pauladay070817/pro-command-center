@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0057b8">
+<link rel="manifest" href="manifest.json">
+<title>Pro Business Command Center</title>
+<style>
+:root{--blue:#0057b8;--blue2:#0b3d91;--green:#16823b;--red:#c62828;--yellow:#f0a429;--bg:#f4f6f8;--card:#fff;--text:#17202a;--muted:#667085;--border:#d9dee7}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,Helvetica,sans-serif}
+header{background:linear-gradient(135deg,var(--blue2),var(--blue));color:#fff;padding:18px 22px}header h1{margin:0 0 5px;font-size:24px}header p{margin:0;font-size:13px;opacity:.9}
+nav{display:flex;gap:8px;overflow-x:auto;padding:10px;background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5}
+nav button,.btn{border:0;border-radius:9px;padding:10px 14px;font-weight:700;cursor:pointer;background:#e8eef7;color:#173b68}
+nav button.active,.btn.primary{background:var(--blue);color:#fff}.btn.green{background:var(--green);color:#fff}.btn.red{background:var(--red);color:#fff}.btn.gray{background:#e9edf2;color:#263238}
+main{max-width:1180px;margin:auto;padding:18px}.page{display:none}.page.active{display:block}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 2px 10px #0000000b}
+h2{margin:0 0 14px;font-size:22px}h3{margin:0 0 10px}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+label{font-size:13px;font-weight:700;color:#344054;display:block;margin-bottom:5px}input,select,textarea{width:100%;padding:10px 11px;border:1px solid var(--border);border-radius:8px;background:#fff;font:inherit}textarea{min-height:90px;resize:vertical}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.metric{border:1px solid var(--border);border-radius:12px;padding:14px;background:#fff}.metric small{display:block;color:var(--muted);margin-bottom:5px}.metric strong{font-size:22px}
+.good{color:var(--green)!important}.bad{color:var(--red)!important}.watch{color:var(--yellow)!important}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:9px;border-bottom:1px solid var(--border);vertical-align:top;font-size:13px}th{background:#f7f9fb}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:center}.pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#edf2f7;font-size:12px;font-weight:700}.thumbs{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.thumbs img{width:82px;height:62px;object-fit:cover;border-radius:7px;border:1px solid var(--border)}
+.empty{color:var(--muted);padding:14px 0}.small{font-size:12px;color:var(--muted)}
+@media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}main{padding:10px}.card{padding:13px}}
+@media(max-width:520px){.grid{grid-template-columns:1fr 1fr}.metric strong{font-size:18px}}
+</style>
+</head>
+<body>
+<header><h1>Pro Business Command Center</h1><p>Store → Departments → Product Groups → Pro → Specialists → Action Plans</p></header>
+<nav id="tabs"></nav>
+<main>
+<section id="dashboard" class="page"></section>
+<section id="numbers" class="page"></section>
+<section id="specialists" class="page"></section>
+<section id="departments" class="page"></section>
+<section id="products" class="page"></section>
+<section id="actions" class="page"></section>
+<section id="walks" class="page"></section>
+<section id="settings" class="page"></section>
+</main>
+<script>
+const KEY='proCommandCenterV4';
+const TAB=[
+ ['dashboard','Dashboard'],['numbers','Numbers'],['specialists','Specialists'],
+ ['departments','Departments'],['products','Product Groups'],['actions','Action Plans'],
+ ['walks','Daily Walks'],['settings','Backup']
+];
+const starterDepartments=['Pro','Lumber','Building Materials','Millwork','Hardware','Electrical','Plumbing','Flooring','Paint','Garden','Tools','Appliances'];
+let db=load(), current='dashboard', edit={};
+
+function blank(){return {numbers:[],specialists:[],departments:[],products:[],actions:[],walks:[]}}
+function load(){try{return Object.assign(blank(),JSON.parse(localStorage.getItem(KEY)||'{}'))}catch(e){return blank()}}
+function save(){localStorage.setItem(KEY,JSON.stringify(db));render()}
+function id(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+function money(n){return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(Number(n)||0)}
+function pct(n){return (Number(n)||0).toFixed(2)+'%'}
+function variance(a,b){return (Number(a)||0)-(Number(b)||0)}
+function variancePct(a,b){return Number(b)?((Number(a)-Number(b))/Number(b))*100:0}
+function cls(v){return v>0?'good':v<0?'bad':'watch'}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function dateToday(){return new Date().toISOString().slice(0,10)}
+function dateFmt(s){if(!s)return '';return new Date(s+'T00:00:00').toLocaleDateString()}
+function statusClass(s){return s==='Complete'?'good':s==='Overdue'?'bad':s==='In Progress'?'watch':''}
+function nav(){document.getElementById('tabs').innerHTML=TAB.map(([id,n])=>`<button class="${current===id?'active':''}" onclick="go('${id}')">${n}</button>`).join('')}
+function go(id){current=id;render()}
+
+function render(){
+ nav();document.querySelectorAll('.page').forEach(x=>x.classList.toggle('active',x.id===current));
+ ({dashboard:renderDashboard,numbers:renderNumbers,specialists:renderSpecialists,departments:renderDepartments,products:renderProducts,actions:renderActions,walks:renderWalks,settings:renderSettings}[current])();
+}
+
+function latest(){return db.numbers.length?db.numbers.slice().sort((a,b)=>b.date.localeCompare(a.date))[0]:null}
+function renderDashboard(){
+ const n=latest(), open=db.actions.filter(a=>a.status!=='Complete').length, overdue=db.actions.filter(a=>a.status!=='Complete'&&a.due&&a.due<dateToday()).length;
+ const products=db.products.slice().sort((a,b)=>variancePct(a.sales,a.plan)-variancePct(b.sales,b.plan)).slice(0,5);
+ document.getElementById('dashboard').innerHTML=`
+ <div class="card"><h2>Store Performance</h2><div class="grid">
+ ${metric('Store Sales',money(n?.store||0))}${metric('Store Plan',money(n?.storePlan||0))}${metric('Store Variance',money(variance(n?.store,n?.storePlan)),cls(variance(n?.store,n?.storePlan)))}
+ ${metric('Pro Sales',money(n?.pro||0))}${metric('Pro Plan',money(n?.proPlan||0))}${metric('Pro Variance',money(variance(n?.pro,n?.proPlan)),cls(variance(n?.pro,n?.proPlan)))}
+ ${metric('Pro Variance %',pct(variancePct(n?.pro,n?.proPlan)),cls(variancePct(n?.pro,n?.proPlan)))}${metric('Pro Credit',money(n?.credit||0))}
+ </div></div>
+ <div class="card"><h2>Quick Actions</h2><div class="actions">
+ <button class="btn primary" onclick="go('numbers')">+ Enter Numbers</button><button class="btn primary" onclick="go('walks')">Daily Walk</button>
+ <button class="btn primary" onclick="go('departments')">Departments</button><button class="btn primary" onclick="go('products')">Product Groups</button><button class="btn primary" onclick="go('actions')">Action Plan</button></div></div>
+ <div class="grid2"><div class="card"><h2>Open Action Plans</h2><div class="metric"><strong>${open}</strong><div class="small">${overdue} overdue</div></div></div>
+ <div class="card"><h2>Bottom 5 Product Groups</h2>${products.length?products.map(p=>`<div class="row"><b>${esc(p.name)}</b><span class="${cls(variancePct(p.sales,p.plan))}">${pct(variancePct(p.sales,p.plan))}</span></div>`).join(''):'<div class="empty">Add product-group numbers to see opportunities.</div>'}</div></div>`;
+}
+function metric(a,b,c=''){return `<div class="metric"><small>${a}</small><strong class="${c}">${b}</strong></div>`}
+
+function renderNumbers(){
+ document.getElementById('numbers').innerHTML=`<div class="card"><h2>Store & Pro Numbers</h2>
+ <div class="grid2"><label>Date<input id="n_date" type="date" value="${edit.n?.date||dateToday()}"></label><label>Total Store Sales<input id="n_store" type="number" step="0.01" value="${edit.n?.store??''}"></label>
+ <label>Store Sales Plan<input id="n_storePlan" type="number" step="0.01" value="${edit.n?.storePlan??''}"></label><label>Pro Sales<input id="n_pro" type="number" step="0.01" value="${edit.n?.pro??''}"></label>
+ <label>Pro Sales Plan<input id="n_proPlan" type="number" step="0.01" value="${edit.n?.proPlan??''}"></label><label>Pro Credit<input id="n_credit" type="number" step="0.01" value="${edit.n?.credit??''}"></label></div>
+ <div class="actions"><button class="btn primary" onclick="saveNumber()">Save Numbers</button><button class="btn gray" onclick="edit={};renderNumbers()">Clear</button></div></div>
+ <div class="card"><h2>Saved Weeks</h2>${db.numbers.length?db.numbers.slice().sort((a,b)=>b.date.localeCompare(a.date)).map((n,i)=>`<div class="row" style="padding:12px 0;border-bottom:1px solid var(--border)"><div><b>${dateFmt(n.date)}</b><div class="small">Store ${money(n.store)} / Plan ${money(n.storePlan)} · Pro ${money(n.pro)} / Plan ${money(n.proPlan)} · Credit ${money(n.credit)}</div></div><div class="actions"><button class="btn gray" onclick="editNumber('${n.id}')">Edit</button><button class="btn red" onclick="del('numbers','${n.id}')">Delete</button></div></div>`).join(''):'<div class="empty">No numbers yet.</div>'}</div>`;
+}
+function saveNumber(){
+ const n={id:edit.n?.id||id(),date:v('n_date'),store:+v('n_store'),storePlan:+v('n_storePlan'),pro:+v('n_pro'),proPlan:+v('n_proPlan'),credit:+v('n_credit')};
+ if(!n.date){alert('Enter a date.');return}
+ const i=db.numbers.findIndex(x=>x.id===n.id); if(i>=0)db.numbers[i]=n; else db.numbers.push(n); edit={};save();go('dashboard')
+}
+function editNumber(i){edit.n=db.numbers.find(x=>x.id===i);go('numbers')}
+
+function renderSpecialists(){
+ document.getElementById('specialists').innerHTML=`<div class="card"><h2>${edit.s?'Edit':'Add'} Specialist</h2><div class="grid2">
+ <label>Name<input id="s_name" value="${esc(edit.s?.name||'')}"></label><label>Sales<input id="s_sales" type="number" step=".01" value="${edit.s?.sales??''}"></label>
+ <label>Sales Plan<input id="s_plan" type="number" step=".01" value="${edit.s?.plan??''}"></label><label>Goal<input id="s_goal" value="${esc(edit.s?.goal||'')}"></label>
+ <label style="grid-column:1/-1">Notes / Opportunity<textarea id="s_notes">${esc(edit.s?.notes||'')}</textarea></label></div>
+ <div class="actions"><button class="btn primary" onclick="saveSpecialist()">Save Specialist</button><button class="btn gray" onclick="edit={};renderSpecialists()">Clear</button></div></div>
+ <div class="card"><h2>Specialist Scoreboard</h2>${db.specialists.length?`<table><tr><th>Name</th><th>Sales</th><th>Plan</th><th>Variance</th><th>Goal</th><th></th></tr>${db.specialists.map(s=>`<tr><td><b>${esc(s.name)}</b><div class="small">${esc(s.notes)}</div></td><td>${money(s.sales)}</td><td>${money(s.plan)}</td><td class="${cls(variance(s.sales,s.plan))}">${money(variance(s.sales,s.plan))} (${pct(variancePct(s.sales,s.plan))})</td><td>${esc(s.goal)}</td><td><button class="btn gray" onclick="editSpecialist('${s.id}')">Edit</button> <button class="btn red" onclick="del('specialists','${s.id}')">Delete</button></td></tr>`).join('')}</table>`:'<div class="empty">No specialists entered.</div>'}</div>`;
+}
+function saveSpecialist(){const s={id:edit.s?.id||id(),name:v('s_name'),sales:+v('s_sales'),plan:+v('s_plan'),goal:v('s_goal'),notes:v('s_notes')};if(!s.name){alert('Enter a specialist name.');return}upsert('specialists',s);edit={};go('specialists')}
+function editSpecialist(i){edit.s=db.specialists.find(x=>x.id===i);go('specialists')}
+
+function renderDepartments(){
+ const rows=db.departments.length?db.departments:starterDepartments.map(name=>({id:'starter-'+name,name,sales:0,plan:0,pro:0,proPlan:0,notes:''}));
+ document.getElementById('departments').innerHTML=`<div class="card"><h2>${edit.d?'Edit':'Add'} Department</h2><div class="grid2">
+ <label>Department<input id="d_name" value="${esc(edit.d?.name||'')}"></label><label>Sales<input id="d_sales" type="number" step=".01" value="${edit.d?.sales??''}"></label>
+ <label>Sales Plan<input id="d_plan" type="number" step=".01" value="${edit.d?.plan??''}"></label><label>Pro Sales<input id="d_pro" type="number" step=".01" value="${edit.d?.pro??''}"></label>
+ <label>Pro Sales Plan<input id="d_proPlan" type="number" step=".01" value="${edit.d?.proPlan??''}"></label><label>Opportunity Notes<input id="d_notes" value="${esc(edit.d?.notes||'')}"></label></div>
+ <div class="actions"><button class="btn primary" onclick="saveDepartment()">Save Department</button><button class="btn gray" onclick="edit={};renderDepartments()">Clear</button></div></div>
+ <div class="card"><h2>Departments</h2><table><tr><th>Department</th><th>Sales Var</th><th>Pro Var</th><th>Opportunity</th><th></th></tr>${rows.map(d=>`<tr><td><b>${esc(d.name)}</b></td><td class="${cls(variance(d.sales,d.plan))}">${money(variance(d.sales,d.plan))}</td><td class="${cls(variance(d.pro,d.proPlan))}">${money(variance(d.pro,d.proPlan))}</td><td>${esc(d.notes||'')}</td><td>${d.id.startsWith('starter-')?'':`<button class="btn gray" onclick="editDepartment('${d.id}')">Edit</button> <button class="btn red" onclick="del('departments','${d.id}')">Delete</button>`}</td></tr>`).join('')}</table></div>`;
+}
+function saveDepartment(){const d={id:edit.d?.id||id(),name:v('d_name'),sales:+v('d_sales'),plan:+v('d_plan'),pro:+v('d_pro'),proPlan:+v('d_proPlan'),notes:v('d_notes')};if(!d.name){alert('Enter a department.');return}upsert('departments',d);edit={};go('departments')}
+function editDepartment(i){edit.d=db.departments.find(x=>x.id===i);go('departments')}
+
+function renderProducts(){
+ const sorted=db.products.slice().sort((a,b)=>variancePct(a.sales,a.plan)-variancePct(b.sales,b.plan));
+ document.getElementById('products').innerHTML=`<div class="card"><h2>${edit.p?'Edit':'Add'} Product Group</h2><div class="grid2">
+ <label>Product Group<input id="p_name" value="${esc(edit.p?.name||'')}"></label><label>Sales<input id="p_sales" type="number" step=".01" value="${edit.p?.sales??''}"></label>
+ <label>Sales Plan<input id="p_plan" type="number" step=".01" value="${edit.p?.plan??''}"></label><label>Priority<select id="p_priority"><option>Normal</option><option ${edit.p?.priority==='High'?'selected':''}>High</option><option ${edit.p?.priority==='Critical'?'selected':''}>Critical</option></select></label>
+ <label style="grid-column:1/-1">Opportunity / Action<textarea id="p_notes">${esc(edit.p?.notes||'')}</textarea></label></div>
+ <div class="actions"><button class="btn primary" onclick="saveProduct()">Save Product Group</button><button class="btn gray" onclick="edit={};renderProducts()">Clear</button><button class="btn green" onclick="makeBottomActions()">Create Actions for Bottom 5</button></div></div>
+ <div class="card"><h2>Product Group Performance — Worst First</h2>${sorted.length?`<table><tr><th>Product Group</th><th>Sales</th><th>Plan</th><th>Variance</th><th>Priority</th><th></th></tr>${sorted.map(p=>`<tr><td><b>${esc(p.name)}</b><div class="small">${esc(p.notes)}</div></td><td>${money(p.sales)}</td><td>${money(p.plan)}</td><td class="${cls(variancePct(p.sales,p.plan))}">${money(variance(p.sales,p.plan))} (${pct(variancePct(p.sales,p.plan))})</td><td>${esc(p.priority)}</td><td><button class="btn gray" onclick="editProduct('${p.id}')">Edit</button> <button class="btn red" onclick="del('products','${p.id}')">Delete</button></td></tr>`).join('')}</table>`:'<div class="empty">Add product groups to begin ranking opportunities.</div>'}</div>`;
+}
+function saveProduct(){const p={id:edit.p?.id||id(),name:v('p_name'),sales:+v('p_sales'),plan:+v('p_plan'),priority:v('p_priority'),notes:v('p_notes')};if(!p.name){alert('Enter a product group.');return}upsert('products',p);edit={};go('products')}
+function editProduct(i){edit.p=db.products.find(x=>x.id===i);go('products')}
+function makeBottomActions(){db.products.slice().sort((a,b)=>variancePct(a.sales,a.plan)-variancePct(b.sales,b.plan)).slice(0,5).forEach(p=>{if(!db.actions.some(a=>a.sourceId===p.id&&a.status!=='Complete'))db.actions.push({id:id(),result:`${money(p.sales)} sales vs ${money(p.plan)} plan`,opportunity:p.notes||`Improve ${p.name}`,action:'Build recovery plan and review weekly',owner:'',goal:'Return to plan',due:'',status:'Open',source:'Product Group',sourceId:p.id})});save();go('actions')}
+
+function renderActions(){
+ const rows=db.actions.slice().sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999'));
+ document.getElementById('actions').innerHTML=`<div class="card"><h2>${edit.a?'Edit':'New'} Action Plan</h2><div class="grid2">
+ <label>Result / Current State<textarea id="a_result">${esc(edit.a?.result||'')}</textarea></label><label>Opportunity<textarea id="a_opp">${esc(edit.a?.opportunity||'')}</textarea></label>
+ <label>Action<textarea id="a_action">${esc(edit.a?.action||'')}</textarea></label><label>Owner<input id="a_owner" value="${esc(edit.a?.owner||'')}"></label>
+ <label>Goal<input id="a_goal" value="${esc(edit.a?.goal||'')}"></label><label>Due Date<input id="a_due" type="date" value="${edit.a?.due||''}"></label>
+ <label>Status<select id="a_status">${['Open','In Progress','Complete'].map(x=>`<option ${edit.a?.status===x?'selected':''}>${x}</option>`).join('')}</select></label>
+ <label>Source<input id="a_source" value="${esc(edit.a?.source||'Manual')}"></label></div>
+ <div class="actions"><button class="btn primary" onclick="saveAction()">Save Action Plan</button><button class="btn gray" onclick="edit={};renderActions()">Clear</button></div></div>
+ <div class="card"><h2>Action Plans</h2>${rows.length?`<table><tr><th>Status</th><th>Opportunity / Action</th><th>Owner</th><th>Goal</th><th>Due</th><th></th></tr>${rows.map(a=>{let over=a.status!=='Complete'&&a.due&&a.due<dateToday();return `<tr><td class="${statusClass(over?'Overdue':a.status)}"><b>${over?'Overdue':esc(a.status)}</b><div class="small">${esc(a.source)}</div></td><td><b>${esc(a.opportunity)}</b><div>${esc(a.action)}</div><div class="small">${esc(a.result)}</div></td><td>${esc(a.owner)}</td><td>${esc(a.goal)}</td><td>${a.due?dateFmt(a.due):'—'}</td><td><button class="btn gray" onclick="editAction('${a.id}')">Edit</button> <button class="btn red" onclick="del('actions','${a.id}')">Delete</button></td></tr>`}).join('')}</table>`:'<div class="empty">No action plans yet.</div>'}</div>`;
+}
+function saveAction(){const a={id:edit.a?.id||id(),result:v('a_result'),opportunity:v('a_opp'),action:v('a_action'),owner:v('a_owner'),goal:v('a_goal'),due:v('a_due'),status:v('a_status'),source:v('a_source')||'Manual'};if(!a.opportunity&&!a.action){alert('Enter an opportunity or action.');return}upsert('actions',a);edit={};go('actions')}
+function editAction(i){edit.a=db.actions.find(x=>x.id===i);go('actions')}
+
+function renderWalks(){
+ document.getElementById('walks').innerHTML=`<div class="card"><h2>${edit.w?'Edit':'New'} Daily Pro Walk</h2><div class="grid2">
+ <label>Date<input id="w_date" type="date" value="${edit.w?.date||dateToday()}"></label><label>Owner<input id="w_owner" value="${esc(edit.w?.owner||'')}"></label>
+ <label>Result / Finding<textarea id="w_result">${esc(edit.w?.result||'')}</textarea></label><label>Opportunity<textarea id="w_opp">${esc(edit.w?.opportunity||'')}</textarea></label>
+ <label>Action / Goal<textarea id="w_action">${esc(edit.w?.action||'')}</textarea></label><label>Follow-up<input id="w_follow" value="${esc(edit.w?.follow||'')}"></label>
+ <label style="grid-column:1/-1">Photos<input id="w_photos" type="file" accept="image/*" multiple></label></div>
+ ${edit.w?.photos?.length?`<div class="thumbs">${edit.w.photos.map(x=>`<img src="${x}">`).join('')}</div>`:''}
+ <div class="actions"><button class="btn primary" onclick="saveWalk()">Save Walk</button><button class="btn gray" onclick="edit={};renderWalks()">Clear</button></div></div>
+ <div class="card"><h2>Walk History</h2>${db.walks.length?db.walks.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(w=>`<div class="card" style="box-shadow:none;margin:0 0 10px"><div class="row"><b>${dateFmt(w.date)} — ${esc(w.owner)}</b><div><button class="btn gray" onclick="editWalk('${w.id}')">Edit</button> <button class="btn red" onclick="del('walks','${w.id}')">Delete</button></div></div><p><b>Finding:</b> ${esc(w.result)}</p><p><b>Opportunity:</b> ${esc(w.opportunity)}</p><p><b>Action:</b> ${esc(w.action)}</p><p><b>Follow-up:</b> ${esc(w.follow)}</p>${w.photos?.length?`<div class="thumbs">${w.photos.map(x=>`<img src="${x}">`).join('')}</div>`:''}</div>`).join(''):'<div class="empty">No walks yet.</div>'}</div>`;
+}
+async function saveWalk(){
+ const files=[...document.getElementById('w_photos').files]; let photos=edit.w?.photos?[...edit.w.photos]:[];
+ for(const f of files){try{photos.push(await readFile(f))}catch(e){}}
+ const w={id:edit.w?.id||id(),date:v('w_date'),owner:v('w_owner'),result:v('w_result'),opportunity:v('w_opp'),action:v('w_action'),follow:v('w_follow'),photos};
+ if(!w.date){alert('Enter a date.');return}upsert('walks',w);edit={};go('walks')
+}
+function editWalk(i){edit.w=db.walks.find(x=>x.id===i);go('walks')}
+function readFile(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)})}
+
+function renderSettings(){
+ document.getElementById('settings').innerHTML=`<div class="card"><h2>Backup / Restore</h2><p class="small">Your records are stored in this browser. Export a backup before changing computers or browsers.</p>
+ <div class="actions"><button class="btn primary" onclick="exportData()">Export Backup</button><label class="btn gray" style="display:inline-block;cursor:pointer">Restore Backup<input type="file" accept=".json,application/json" style="display:none" onchange="restoreData(this)"></label><button class="btn red" onclick="clearAll()">Clear All Data</button></div></div>
+ <div class="card"><h2>Current Record Counts</h2><div class="grid">${metric('Numbers',db.numbers.length)}${metric('Specialists',db.specialists.length)}${metric('Departments',db.departments.length)}${metric('Product Groups',db.products.length)}${metric('Actions',db.actions.length)}${metric('Daily Walks',db.walks.length)}</div></div>`;
+}
+function exportData(){const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='pro-command-center-backup-'+dateToday()+'.json';a.click();URL.revokeObjectURL(a.href)}
+function restoreData(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{db=Object.assign(blank(),JSON.parse(r.result));save();alert('Backup restored.')}catch(e){alert('That backup could not be read.')}};r.readAsText(f)}
+function clearAll(){if(confirm('Delete all Command Center data from this browser? This cannot be undone unless you have an exported backup.')){db=blank();save()}}
+function v(id){return document.getElementById(id)?.value||''}
+function upsert(type,obj){const i=db[type].findIndex(x=>x.id===obj.id);if(i>=0)db[type][i]=obj;else db[type].push(obj);save()}
+function del(type,i){if(confirm('Delete this record?')){db[type]=db[type].filter(x=>x.id!==i);save()}}
+
+render();
+</script>
+</body>
+</html>
