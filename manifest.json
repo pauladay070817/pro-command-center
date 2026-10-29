@@ -1,0 +1,8 @@
+{
+  "name": "Pro Business Command Center",
+  "short_name": "Pro Command",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4f6f8",
+  "theme_color": "#0b5cab"
+}

@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b5cab">
+<link rel="manifest" href="manifest.json">
+<title>Pro Business Command Center</title>
+<style>
+:root{--blue:#0b5cab;--bg:#f4f6f8;--card:#fff;--text:#17212b;--muted:#687583;--green:#167c3a;--red:#b42318;--yellow:#a15c00}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--text)}
+header{background:var(--blue);color:#fff;padding:17px 15px;position:sticky;top:0;z-index:5}
+header h1{margin:0;font-size:20px}header p{margin:5px 0 0;font-size:12px;opacity:.9}
+nav{display:flex;gap:7px;overflow:auto;padding:9px 12px;background:#fff;position:sticky;top:69px;z-index:4;border-bottom:1px solid #ddd}
+nav button{white-space:nowrap;padding:9px 11px;font-size:12px}
+main{padding:12px;max-width:950px;margin:auto}.card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 5px #0001}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.actions{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.metric{font-size:22px;font-weight:700;margin-top:4px}.label,.small{font-size:12px;color:var(--muted)}
+.row{display:flex;justify-content:space-between;gap:8px;align-items:center}.item{padding:11px 0;border-top:1px solid #e5e8eb}
+input,select,textarea{width:100%;padding:11px;border:1px solid #ccd4dc;border-radius:9px;margin:5px 0 10px;background:#fff;font:inherit}
+textarea{min-height:70px}button{border:0;border-radius:9px;padding:11px 13px;font-weight:700;background:var(--blue);color:#fff}
+button.secondary{background:#e9eef4;color:var(--text)}button.danger{background:#b42318}button.edit{background:#6b7280}
+.green{color:var(--green)}.red{color:var(--red)}.yellow{color:var(--yellow)}.hidden{display:none}
+.pill{padding:4px 8px;border-radius:999px;background:#eef2f6;font-size:11px}.status{font-size:11px;font-weight:700}
+img.photo{max-width:100%;border-radius:9px;margin-top:8px}
+@media(min-width:700px){.grid{grid-template-columns:repeat(4,1fr)}.actions{grid-template-columns:repeat(4,1fr)}}
+</style>
+</head>
+<body>
+<header><h1>Pro Business Command Center</h1><p>Store → Departments → Product Groups → Pro → Specialists → Action Plans</p></header>
+<nav>
+<button onclick="show('dashboard')">Dashboard</button><button onclick="show('numbers')">Numbers</button>
+<button onclick="show('specialists')">Specialists</button><button onclick="show('departments')">Departments</button>
+<button onclick="show('products')">Product Groups</button><button onclick="show('actionsPage')">Action Plans</button>
+<button onclick="show('walks')">Daily Walks</button>
+</nav>
+<main>
+<section id="dashboard">
+<div class="card"><div class="row"><h2>Store Performance</h2><span class="pill">Latest</span></div>
+<div class="grid">
+<div><div class="label">Store Sales</div><div class="metric" id="dStore">$0</div></div>
+<div><div class="label">Store Variance</div><div class="metric" id="dStoreVar">—</div></div>
+<div><div class="label">Pro Sales</div><div class="metric" id="dPro">$0</div></div>
+<div><div class="label">Pro Variance</div><div class="metric" id="dProVar">—</div></div>
+</div></div>
+<div class="card"><h2>Quick Actions</h2><div class="actions">
+<button onclick="show('numbers')">➕ Import Numbers</button><button onclick="show('walks')">📷 Daily Walk</button>
+<button onclick="show('departments')">🏢 Departments</button><button onclick="show('actionsPage')">🎯 Action Plan</button>
+</div></div>
+<div class="card"><h2>Current Opportunities</h2><div id="dashList"></div></div>
+<div class="card"><h2>Backup / Restore</h2><button onclick="exportData()">Export Backup</button> <button class="secondary" onclick="document.getElementById('restore').click()">Restore Backup</button><input id="restore" type="file" accept=".json" style="display:none" onchange="restoreData(event)"><p class="small">Use a backup when changing phones or browsers.</p></div>
+</section>
+
+<section id="numbers" class="hidden"><div class="card"><h2>Store & Pro Numbers</h2>
+<label>Date<input id="nDate" type="date"></label><label>Total Store Sales<input id="storeSales" type="number" step=".01"></label>
+<label>Store Sales Plan<input id="storePlan" type="number" step=".01"></label><label>Pro Sales<input id="proSales" type="number" step=".01"></label>
+<label>Pro Sales Plan<input id="proPlan" type="number" step=".01"></label><label>Pro Credit<input id="proCredit" type="number" step=".01"></label>
+<button onclick="saveNumbers()">Save Numbers</button> <button class="secondary" onclick="clearForm('numbers')">Clear</button></div>
+<div class="card"><h2>Saved Weeks</h2><div id="numbersList"></div></div></section>
+
+<section id="specialists" class="hidden"><div class="card"><h2>Sales Specialist</h2>
+<label>Name<select id="spName"><option>Angel</option><option>Jackie</option><option>Joanne</option></select></label>
+<label>Sales<input id="spSales" type="number" step=".01"></label><label>Goal<input id="spGoal" type="number" step=".01"></label>
+<label>Credit<input id="spCredit" type="number" step=".01"></label><label>Credit Goal<input id="spCreditGoal" type="number" step=".01"></label>
+<button onclick="saveSpecialist()">Save Specialist</button></div><div class="card"><h2>Specialist Performance</h2><div id="spList"></div></div></section>
+
+<section id="departments" class="hidden"><div class="card"><h2>Department Performance</h2>
+<label>Department<input id="depName" placeholder="e.g. Flooring"></label><label>Sales<input id="depSales" type="number" step=".01"></label>
+<label>Sales Plan<input id="depPlan" type="number" step=".01"></label><label>Comp %<input id="depComp" type="number" step=".01" placeholder="-5.25"></label>
+<label>Pro Sales<input id="depPro" type="number" step=".01"></label><button onclick="saveDepartment()">Save Department</button></div>
+<div class="card"><h2>Departments</h2><div id="depList"></div></div></section>
+
+<section id="products" class="hidden"><div class="card"><h2>Product Group</h2>
+<label>Product Group<input id="prodName" placeholder="e.g. Sheet Vinyl"></label><label>Sales<input id="prodSales" type="number" step=".01"></label>
+<label>Sales Plan<input id="prodPlan" type="number" step=".01"></label><label>Comp %<input id="prodComp" type="number" step=".01"></label>
+<label>Pro Sales<input id="prodPro" type="number" step=".01"></label><button onclick="saveProduct()">Save Product Group</button></div>
+<div class="card"><h2>Product Groups</h2><div id="prodList"></div></div></section>
+
+<section id="actionsPage" class="hidden"><div class="card"><h2>Action Plan</h2>
+<label>Department / Product Group<input id="aFocus" placeholder="e.g. Flooring / Sheet Vinyl"></label><label>Opportunity<input id="aProblem" placeholder="What is the issue?"></label>
+<label>Action<input id="aAction" placeholder="What will we do?"></label><label>Owner<input id="aOwner"></label><label>Goal<input id="aGoal"></label>
+<label>Due Date<input id="aDue" type="date"></label><label>Status<select id="aStatus"><option>Open</option><option>In Progress</option><option>Complete</option></select></label>
+<button onclick="saveAction()">Save Action Plan</button></div><div class="card"><h2>Action Plans</h2><div id="actionList"></div></div></section>
+
+<section id="walks" class="hidden"><div class="card"><h2>Daily Walk</h2>
+<label>Date<input id="walkDate" type="date"></label><label>Department<input id="walkDep"></label><label>Associate<input id="walkAssoc"></label>
+<label>Observation<textarea id="walkObs"></textarea></label><label>Action<textarea id="walkAction"></textarea></label>
+<label>Photo<input id="walkPhoto" type="file" accept="image/*" capture="environment"></label><button onclick="saveWalk()">Save Walk</button></div>
+<div class="card"><h2>Walk History</h2><div id="walkList"></div></div></section>
+</main>
+<script>
+const KEY='proCommandCenterV2';
+let db=JSON.parse(localStorage.getItem(KEY)||'{"numbers":[],"specialists":[],"departments":[],"products":[],"actions":[],"walks":[]}');
+const $=id=>document.getElementById(id);
+function persist(){localStorage.setItem(KEY,JSON.stringify(db));render()}
+function money(n){return '$'+Number(n||0).toLocaleString(undefined,{maximumFractionDigits:0})}
+function v(a,b){return Number(a||0)-Number(b||0)}
+function cls(x){return x>=0?'green':'red'}
+function show(id){document.querySelectorAll('main section').forEach(s=>s.classList.add('hidden'));$(id).classList.remove('hidden');render()}
+function clearForm(section){$(section).querySelectorAll('input,textarea').forEach(x=>x.value='')}
+function saveNumbers(){db.numbers.unshift({date:$('nDate').value||new Date().toISOString().slice(0,10),store:+$('storeSales').value||0,storePlan:+$('storePlan').value||0,pro:+$('proSales').value||0,proPlan:+$('proPlan').value||0,credit:+$('proCredit').value||0});persist();show('dashboard')}
+function saveSpecialist(){db.specialists.unshift({name:$('spName').value,sales:+$('spSales').value||0,goal:+$('spGoal').value||0,credit:+$('spCredit').value||0,creditGoal:+$('spCreditGoal').value||0});persist()}
+function saveDepartment(){db.departments.unshift({name:$('depName').value||'Department',sales:+$('depSales').value||0,plan:+$('depPlan').value||0,comp:+$('depComp').value||0,pro:+$('depPro').value||0});persist()}
+function saveProduct(){db.products.unshift({name:$('prodName').value||'Product Group',sales:+$('prodSales').value||0,plan:+$('prodPlan').value||0,comp:+$('prodComp').value||0,pro:+$('prodPro').value||0});persist()}
+function saveAction(){db.actions.unshift({focus:$('aFocus').value,problem:$('aProblem').value,action:$('aAction').value,owner:$('aOwner').value,goal:$('aGoal').value,due:$('aDue').value,status:$('aStatus').value});persist()}
+function saveWalk(){let f=$('walkPhoto').files[0], done=src=>{db.walks.unshift({date:$('walkDate').value||new Date().toISOString().slice(0,10),dep:$('walkDep').value,assoc:$('walkAssoc').value,obs:$('walkObs').value,action:$('walkAction').value,photo:src||''});persist()};if(f){let r=new FileReader();r.onload=()=>done(r.result);r.readAsDataURL(f)}else done('')}
+function del(t,i){if(confirm('Delete this entry?')){db[t].splice(i,1);persist()}}
+function edit(t,i){let x=db[t][i];if(t==='departments'){show('departments');$('depName').value=x.name;$('depSales').value=x.sales;$('depPlan').value=x.plan;$('depComp').value=x.comp;$('depPro').value=x.pro;db[t].splice(i,1)}
+else if(t==='products'){show('products');$('prodName').value=x.name;$('prodSales').value=x.sales;$('prodPlan').value=x.plan;$('prodComp').value=x.comp;$('prodPro').value=x.pro;db[t].splice(i,1)}
+else if(t==='actions'){show('actionsPage');$('aFocus').value=x.focus;$('aProblem').value=x.problem;$('aAction').value=x.action;$('aOwner').value=x.owner;$('aGoal').value=x.goal;$('aDue').value=x.due;$('aStatus').value=x.status;db[t].splice(i,1)}
+else if(t==='specialists'){show('specialists');$('spName').value=x.name;$('spSales').value=x.sales;$('spGoal').value=x.goal;$('spCredit').value=x.credit;$('spCreditGoal').value=x.creditGoal;db[t].splice(i,1)}
+else if(t==='numbers'){show('numbers');$('nDate').value=x.date;$('storeSales').value=x.store;$('storePlan').value=x.storePlan;$('proSales').value=x.pro;$('proPlan').value=x.proPlan;$('proCredit').value=x.credit;db[t].splice(i,1)}
+localStorage.setItem(KEY,JSON.stringify(db));render()}
+function buttons(t,i){return `<button class=edit onclick="edit('${t}',${i})">Edit</button> <button class=danger onclick="del('${t}',${i})">Delete</button>`}
+function exportData(){let blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='pro-command-backup.json';a.click()}
+function restoreData(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{db=JSON.parse(r.result);persist();alert('Backup restored.')}catch{alert('Invalid backup file.')}};r.readAsText(f)}
+function render(){
+let n=db.numbers[0];$('dStore').textContent=money(n?.store);$('dPro').textContent=money(n?.pro);
+if(n){let sv=v(n.store,n.storePlan),pv=v(n.pro,n.proPlan);$('dStoreVar').textContent=money(sv);$('dStoreVar').className='metric '+cls(sv);$('dProVar').textContent=money(pv);$('dProVar').className='metric '+cls(pv)}
+$('numbersList').innerHTML=db.numbers.map((x,i)=>`<div class=item><div class=row><b>${x.date}</b><span>${buttons('numbers',i)}</span></div><div class=small>Store ${money(x.store)} / Plan ${money(x.storePlan)} · Pro ${money(x.pro)} / Plan ${money(x.proPlan)} · Credit ${money(x.credit)}</div></div>`).join('')||'<p class=small>No numbers yet.</p>';
+$('spList').innerHTML=db.specialists.map((x,i)=>`<div class=item><div class=row><b>${x.name}</b><span>${buttons('specialists',i)}</span></div><div>Sales ${money(x.sales)} · <span class=${cls(v(x.sales,x.goal))}>${money(v(x.sales,x.goal))}</span> variance</div><div>Credit ${money(x.credit)} · <span class=${cls(v(x.credit,x.creditGoal))}>${money(v(x.credit,x.creditGoal))}</span> variance</div></div>`).join('')||'<p class=small>No specialists yet.</p>';
+$('depList').innerHTML=db.departments.map((x,i)=>`<div class=item><div class=row><b>${x.name}</b><span>${buttons('departments',i)}</span></div><div>Sales ${money(x.sales)} / Plan ${money(x.plan)} · <span class=${cls(v(x.sales,x.plan))}>${money(v(x.sales,x.plan))}</span></div><div>Comp ${x.comp}% · Pro ${money(x.pro)}</div></div>`).join('')||'<p class=small>No departments yet.</p>';
+$('prodList').innerHTML=db.products.map((x,i)=>`<div class=item><div class=row><b>${x.name}</b><span>${buttons('products',i)}</span></div><div>Sales ${money(x.sales)} / Plan ${money(x.plan)} · <span class=${cls(v(x.sales,x.plan))}>${money(v(x.sales,x.plan))}</span></div><div>Comp ${x.comp}% · Pro ${money(x.pro)}</div></div>`).join('')||'<p class=small>No product groups yet.</p>';
+$('actionList').innerHTML=db.actions.map((x,i)=>`<div class=item><div class=row><b>${x.focus}</b><span class=pill>${x.status}</span></div><div>${x.problem}</div><div class=small><b>Action:</b> ${x.action}<br><b>Owner:</b> ${x.owner||'—'} · <b>Goal:</b> ${x.goal||'—'} · <b>Due:</b> ${x.due||'—'}</div><div style="margin-top:7px">${buttons('actions',i)}</div></div>`).join('')||'<p class=small>No action plans yet.</p>';
+$('walkList').innerHTML=db.walks.map((x,i)=>`<div class=item><div class=row><b>${x.date} · ${x.dep||'Department'}</b><span>${buttons('walks',i)}</span></div><div>${x.assoc||''}</div><div class=small>${x.obs||''}<br><b>Action:</b> ${x.action||''}</div>${x.photo?`<img class=photo src="${x.photo}">`:''}</div>`).join('')||'<p class=small>No walks yet.</p>';
+$('dashList').innerHTML=db.departments.slice(0,8).map(x=>{let z=v(x.sales,x.plan);return `<div class=item><div class=row><b>${x.name}</b><b class=${cls(z)}>${money(z)}</b></div><div class=small>Comp ${x.comp}% · Pro ${money(x.pro)}</div></div>`}).join('')||'<p class=small>Add department numbers to see opportunities.</p>';
+}
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});render();
+</script>
+</body></html>
