@@ -59,7 +59,7 @@ function variance(a,b){return (Number(a)||0)-(Number(b)||0)}
 function variancePct(a,b){return Number(b)?((Number(a)-Number(b))/Number(b))*100:0}
 function cls(v){return v>0?'good':v<0?'bad':'watch'}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function dateToday(){return new Date().toISOString().slice(0,10)}
+function dateToday(){const d=new Date(),off=d.getTimezoneOffset();return new Date(d.getTime()-off*60000).toISOString().slice(0,10)}
 function dateFmt(s){if(!s)return '';return new Date(s+'T00:00:00').toLocaleDateString()}
 function statusClass(s){return s==='Complete'?'good':s==='Overdue'?'bad':s==='In Progress'?'watch':''}
 function nav(){document.getElementById('tabs').innerHTML=TAB.map(([id,n])=>`<button class="${current===id?'active':''}" onclick="go('${id}')">${n}</button>`).join('')}
@@ -74,17 +74,27 @@ function latest(){return db.numbers.length?db.numbers.slice().sort((a,b)=>b.date
 function renderDashboard(){
  const n=latest(), open=db.actions.filter(a=>a.status!=='Complete').length, overdue=db.actions.filter(a=>a.status!=='Complete'&&a.due&&a.due<dateToday()).length;
  const products=db.products.slice().sort((a,b)=>variancePct(a.sales,a.plan)-variancePct(b.sales,b.plan)).slice(0,5);
+ const depts=db.departments.slice().sort((a,b)=>variancePct(a.sales,a.plan)-variancePct(b.sales,b.plan)).slice(0,5);
+ const specialists=db.specialists.slice().sort((a,b)=>variancePct(b.sales,b.plan)-variancePct(a.sales,a.plan));
+ const penetration=n&&n.store?((Number(n.pro)||0)/Number(n.store))*100:0;
+ const weeks=db.numbers.slice().sort((a,b)=>a.date.localeCompare(b.date)).slice(-6);
  document.getElementById('dashboard').innerHTML=`
- <div class="card"><h2>Store Performance</h2><div class="grid">
+ <div class="card"><div class="row"><div><h2 style="margin-bottom:4px">Latest Store / Pro Performance</h2><div class="small">${n?'As of '+dateFmt(n.date):'Enter your first set of numbers'}</div></div><span class="pill">Pro Penetration ${pct(penetration)}</span></div>
+ <div class="grid">
  ${metric('Store Sales',money(n?.store||0))}${metric('Store Plan',money(n?.storePlan||0))}${metric('Store Variance',money(variance(n?.store,n?.storePlan)),cls(variance(n?.store,n?.storePlan)))}
  ${metric('Pro Sales',money(n?.pro||0))}${metric('Pro Plan',money(n?.proPlan||0))}${metric('Pro Variance',money(variance(n?.pro,n?.proPlan)),cls(variance(n?.pro,n?.proPlan)))}
- ${metric('Pro Variance %',pct(variancePct(n?.pro,n?.proPlan)),cls(variancePct(n?.pro,n?.proPlan)))}${metric('Pro Credit',money(n?.credit||0))}
+ ${metric('Pro Variance %',pct(variancePct(n?.pro,n?.proPlan)),cls(variancePct(n?.pro,n?.proPlan)))}${metric('Pro Credit',money(n?.credit||0))}${metric('Open / Overdue Actions',open+' / '+overdue,overdue?'bad':'')}
  </div></div>
  <div class="card"><h2>Quick Actions</h2><div class="actions">
- <button class="btn primary" onclick="go('numbers')">+ Enter Numbers</button><button class="btn primary" onclick="go('walks')">Daily Walk</button>
- <button class="btn primary" onclick="go('departments')">Departments</button><button class="btn primary" onclick="go('products')">Product Groups</button><button class="btn primary" onclick="go('actions')">Action Plan</button></div></div>
- <div class="grid2"><div class="card"><h2>Open Action Plans</h2><div class="metric"><strong>${open}</strong><div class="small">${overdue} overdue</div></div></div>
- <div class="card"><h2>Bottom 5 Product Groups</h2>${products.length?products.map(p=>`<div class="row"><b>${esc(p.name)}</b><span class="${cls(variancePct(p.sales,p.plan))}">${pct(variancePct(p.sales,p.plan))}</span></div>`).join(''):'<div class="empty">Add product-group numbers to see opportunities.</div>'}</div></div>`;
+ <button class="btn primary" onclick="go('numbers')">+ Enter Numbers</button><button class="btn primary" onclick="go('walks')">+ Daily Walk</button>
+ <button class="btn primary" onclick="go('departments')">Departments</button><button class="btn primary" onclick="go('products')">Product Groups</button><button class="btn primary" onclick="go('actions')">Action Plan</button><button class="btn primary" onclick="go('specialists')">Specialists</button></div></div>
+ <div class="grid2">
+ <div class="card"><h2>Bottom Department Opportunities</h2>${depts.length?'<table><tr><th>Department</th><th>Variance</th><th>Pro Variance</th></tr>'+depts.map(d=>`<tr><td><b>${esc(d.name)}</b></td><td class="${cls(variancePct(d.sales,d.plan))}">${money(variance(d.sales,d.plan))} (${pct(variancePct(d.sales,d.plan))})</td><td class="${cls(variancePct(d.pro,d.proPlan))}">${money(variance(d.pro,d.proPlan))}</td></tr>`).join('')+'</table>':'<div class="empty">Add department numbers to see opportunities.</div>'}</div>
+ <div class="card"><h2>Bottom Product-Group Opportunities</h2>${products.length?'<table><tr><th>Product Group</th><th>Variance</th><th>Priority</th></tr>'+products.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td class="${cls(variancePct(p.sales,p.plan))}">${money(variance(p.sales,p.plan))} (${pct(variancePct(p.sales,p.plan))})</td><td>${esc(p.priority)}</td></tr>`).join('')+'</table>':'<div class="empty">Add product-group numbers to see opportunities.</div>'}</div></div>
+ <div class="card"><h2>Specialist Scoreboard</h2>${specialists.length?'<table><tr><th>Rank</th><th>Specialist</th><th>Sales</th><th>Plan</th><th>Variance</th><th>Goal</th></tr>'+specialists.map((s,i)=>`<tr><td><b>#${i+1}</b></td><td>${esc(s.name)}</td><td>${money(s.sales)}</td><td>${money(s.plan)}</td><td class="${cls(variancePct(s.sales,s.plan))}">${money(variance(s.sales,s.plan))} (${pct(variancePct(s.sales,s.plan))})</td><td>${esc(s.goal)}</td></tr>`).join('')+'</table>':'<div class="empty">Add specialists to build the scoreboard.</div>'}</div>
+ <div class="grid2">
+ <div class="card"><h2>Pro Sales Trend</h2>${weeks.length?'<table><tr><th>Week</th><th>Pro Sales</th><th>Plan</th><th>Var %</th></tr>'+weeks.map(w=>`<tr><td>${dateFmt(w.date)}</td><td>${money(w.pro)}</td><td>${money(w.proPlan)}</td><td class="${cls(variancePct(w.pro,w.proPlan))}">${pct(variancePct(w.pro,w.proPlan))}</td></tr>`).join('')+'</table>':'<div class="empty">Enter multiple weeks to see your trend.</div>'}</div>
+ <div class="card"><h2>Open Action Plans</h2>${open?'<table><tr><th>Opportunity</th><th>Owner</th><th>Due</th><th>Status</th></tr>'+db.actions.filter(a=>a.status!=='Complete').slice().sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999')).slice(0,8).map(a=>{let over=a.due&&a.due<dateToday();return `<tr><td><b>${esc(a.opportunity)}</b><div class="small">${esc(a.action)}</div></td><td>${esc(a.owner)}</td><td>${a.due?dateFmt(a.due):'—'}</td><td class="${statusClass(over?'Overdue':a.status)}">${over?'Overdue':esc(a.status)}</td></tr>`}).join('')+'</table>':'<div class="empty">No open action plans.</div>'}</div></div>`;
 }
 function metric(a,b,c=''){return `<div class="metric"><small>${a}</small><strong class="${c}">${b}</strong></div>`}
 
