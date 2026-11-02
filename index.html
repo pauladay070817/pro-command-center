@@ -92,7 +92,7 @@ function render(){
  nav();
  document.querySelectorAll('.page').forEach(x=>x.classList.toggle('active',x.id===current));
  const renderers={dashboard:renderDashboard,numbers:renderNumbers,specialists:renderSpecialists,departments:renderDepartments,products:renderProducts,associates:renderAssociates,actions:renderActions,walks:renderWalks,photos:renderPhotoIntelligence,review:renderBusinessReview,wins:renderRecognitionWins,scorecards:renderTeamScorecards,executive:renderExecutiveCommand,opportunities:renderOpportunities,services:renderServicesInstall,deliveries:renderDeliveryTracker,customers:renderCustomerTracker,quotes:renderQuoteTracker,credit:renderCreditTracker,goals:renderGoalCenter,growth:renderGrowthTracker,priorities:renderSmartPriorities,brief:renderDailyBrief,district:renderDistrictWalkReady,rhythm:renderOperatingRhythm,weekly:renderWeeklyCommandBoard,todo:renderTodoReminders,quick:renderQuickEntry,capture:renderPhotoCapture,followup:renderFollowUpControl,settings:renderSettings};
- if(renderers[current]) renderers[current]();
+ if(renderers[current]){try{renderers[current]()}catch(e){const box=document.getElementById(current);if(box)box.innerHTML='<div class="card"><h2>Command Center needs a quick repair</h2><p>The page hit an error while loading: <b>'+String(e&&e.message||e).replace(/[&<>]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch]))+'</b></p><p class="small">Your saved browser data has not been erased. Please send a screenshot of this message.</p></div>';console.error('Command Center render error:',e)}}
 }
 
 function latest(){return db.numbers.length?db.numbers.slice().sort((a,b)=>b.date.localeCompare(a.date))[0]:null}
