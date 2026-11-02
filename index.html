@@ -251,7 +251,7 @@ function renderAssociates(){
 function saveAssociate(){const a={id:edit.as?.id||id(),name:v('as_name'),department:v('as_dept'),role:v('as_role'),goal:v('as_goal'),status:v('as_status'),notes:v('as_notes')};if(!a.name){alert('Enter an associate name.');return}upsert('associates',a);edit={};go('associates')}
 function editAssociate(i){edit.as=db.associates.find(x=>x.id===i);go('associates')}
 
-function departmentProComp(d){return Number(d.proComp??departmentProComp(d)??0)}
+function departmentProComp(d){return Number(d.proComp??d.proPlan??0)}
 function departmentPartnershipScore(d){if(d.partnershipScore)return Number(d.partnershipScore);const referral=Math.min(Number(d.referrals||0)*10,40);const opp=Math.min(Number(d.opportunities||0)*10,30);const sales=Number(d.oppSales||0)>0?30:0;return Math.min(100,referral+opp+sales)}
 function renderDepartmentPartnership(){
  const rows=db.departments.slice().sort((a,b)=>departmentPartnershipScore(b)-departmentPartnershipScore(a));
@@ -691,7 +691,8 @@ function completeTodo(i){const x=(db.todos||[]).find(t=>t.id===i);if(x){x.comple
 function deleteTodo(i){db.todos=(db.todos||[]).filter(t=>t.id!==i);save();go('todo')}
 async function enableTodoNotifications(){if(!('Notification'in window)){alert('Browser notifications are not supported here.');return}const p=await Notification.requestPermission();alert(p==='granted'?'Reminder notifications enabled. Keep the Command Center open for scheduled reminders.':'Notification permission was not granted.')}
 function checkTodoReminders(){if(!db.todos||!('Notification'in window)||Notification.permission!=='granted')return;const now=new Date(),ds=now.toISOString().slice(0,10),tm=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');db.todos.filter(t=>!t.completed&&t.due===ds&&t.reminder===tm&&!t.notified).forEach(t=>{new Notification('Pro Command Center Reminder',{body:t.text});t.notified=true;save()})}
-setInterval(checkTodoReminders,60000);function renderWeeklyCommandBoard(){
+setInterval(checkTodoReminders,60000);function startOfWeek(value){const d=new Date(value+'T00:00:00');const day=d.getDay();d.setDate(d.getDate()-(day===0?6:day-1));return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function renderWeeklyCommandBoard(){
  const today=dateToday(),start=startOfWeek(today),end=new Date(start+'T00:00:00');end.setDate(end.getDate()+6);
  const endDate=end.toISOString().slice(0,10),weekActions=db.actions.filter(a=>a.due>=start&&a.due<=endDate),open=weekActions.filter(a=>a.status!=='Complete'),done=weekActions.filter(a=>a.status==='Complete'),overdue=db.actions.filter(a=>a.status!=='Complete'&&a.due&&a.due<today),follow=db.opportunities.filter(o=>!['Won','Lost'].includes(o.stage)&&o.nextFollowUp&&o.nextFollowUp<=endDate),wins=db.wins||[],weekWins=wins.filter(w=>w.date>=start&&w.date<=endDate);
  const days=[['Monday','Business Plan','Review numbers, gaps, specialists, bottom departments'],['Tuesday','Customer & Pipeline','Work customers, quotes, MVD and new opportunities'],['Wednesday','Team Accountability','Walks, coaching, specialist commitments and recognition'],['Thursday','Execution','Delivery, flatbed, install/service and overdue issues'],['Friday','Results & Recovery','Close the week, document wins and build next week']];
