@@ -133,6 +133,7 @@ function saveNumber(){
  edit={};save();go('dashboard');
 }
 function editNumber(i){edit.n=db.numbers.find(x=>x.id===i);go('numbers')}
+function metric(a,b,c=''){return `<div class="metric"><small>${a}</small><strong class="${c}">${b}</strong></div>`}
 function specialistScore(s){
  const v=variancePct(s.sales,s.plan);
  return Math.max(0,Math.min(100,50+v));
